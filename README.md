@@ -6,6 +6,8 @@
 
 Build on top of [Ray-Tracer-Legacy](https://github.com/Will1162/Ray-Tracer-Legacy), which ran on the CPU, as a single thread. This was slow, so I decided to convert the entire codebase into an OpenCL project, so that it would run in parellel. The conversion process took some time, as I needed to learn the quirks of programming with OpenCL and GPUs in general, but this repository continues from where the legacy project was last commited to.
 
+The inspiration and general implementation techniques came from Peter Shirley's [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html). As development platforms varied, I had to find ways to adapt Peter's code to work with my own codebase, especially as OpenCL does not yet support C++ features such as classes, as it is based on C99.
+
 ## Comparison to Legacy-Ray-Tracer
 
 ### Output variables
