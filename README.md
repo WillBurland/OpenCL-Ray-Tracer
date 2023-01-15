@@ -41,6 +41,11 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 
 ![output](https://user-images.githubusercontent.com/39223201/212554754-de0f2e15-93e3-49d4-ac89-50cbbbfc367e.png)
 
+## To-do
+
+- Glass materials
+- Splitting the render area into blocks/chunks, would use less memory, maybe a tiny performance hit
+
 ## Notes
 
 - Output resolution width must be a multiple of 128 (unsure as of *exactly* why)
