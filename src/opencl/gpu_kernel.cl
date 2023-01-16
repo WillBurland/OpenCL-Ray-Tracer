@@ -15,6 +15,7 @@ typedef struct
 {
 	Vec3 albedo;
 	float fuzz;
+	float ior;
 	int type;
 } Material;
 
@@ -40,10 +41,6 @@ typedef struct
 	Vec3 horizontal;
 	Vec3 vertical;
 	Vec3 lowerLeftCorner;
-	float aspectRatio;
-	float viewportWidth;
-	float viewportHeight;
-	float focalLength;
 } Camera;
 
 // ===== FUNCTION DEFINITIONS =====
@@ -69,6 +66,7 @@ ulong NextSeed(ulong seed);
 float RandFloatFromSeed(ulong *seed);
 bool LambertianScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
+bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 
 // ===== VECTOR FUNCTIONS =====
 
@@ -187,6 +185,21 @@ Vec3 Vec3Reflect(Vec3 v, Vec3 n)
 	return Vec3SubVec3(v, Vec3MulFloat(n, 2.0f * Vec3Dot(v, n)));
 }
 
+Vec3 Vec3Refract(Vec3 uv, Vec3 n, float etaiOverEtat)
+{
+	float cosTheta = fmin(Vec3Dot(Vec3MulFloat(uv, -1.0f), n), 1.0f);
+	Vec3 rOutPerp = Vec3AddVec3(Vec3MulFloat(uv, etaiOverEtat), Vec3MulFloat(n, cosTheta * etaiOverEtat));
+	Vec3 rOutParallel = Vec3MulFloat(n, -sqrt(fabs(1.0f - Vec3LengthSquared(rOutPerp))));
+	return Vec3AddVec3(rOutPerp, rOutParallel);
+}
+
+double Vec3Reflectance(double cosine, double refIdx)
+{
+	double r0 = (1 - refIdx) / (1 + refIdx);
+	r0 = r0 * r0;
+	return r0 + (1 - r0) * pow((1 - cosine), 5);
+}
+
 // ===== RAY FUNCTIONS =====
 
 Vec3 RayAt(Ray ray, float t)
@@ -244,6 +257,20 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, ulong *s
 						return (Vec3){ 0, 0, 0 };
 					}
 				} break;
+				case 2:
+				{
+					if (DielectricScatter(ray, &hitRecord, &attenuation, &scattered, seed))
+					{
+						ray = scattered;
+						finalColour = Vec3MulVec3(finalColour, attenuation);
+						currentDepth++;
+						continue;
+					}
+					else
+					{
+						return (Vec3){ 0, 0, 0 };
+					}
+				}
 			}
 			currentDepth++;
 			continue;
@@ -317,6 +344,33 @@ bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scatter
 	return Vec3Dot(scattered->direction, hitRecord->normal) > 0;
 }
 
+bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed)
+{
+	*attenuation = (Vec3){ 1.0f, 1.0f, 1.0f };
+	float refractionRatio = hitRecord->frontFace ? (1.0f / hitRecord->material.ior) : hitRecord->material.ior;
+
+	Vec3 unitDirection = Vec3Unit(ray.direction);
+	float cosTheta = fmin(Vec3Dot(Vec3MulFloat(unitDirection, -1), hitRecord->normal), 1.0f);
+	float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+
+	bool cannotRefract = refractionRatio * sinTheta > 1.0f;
+	Vec3 direction;
+
+	if (cannotRefract || Vec3Reflectance(cosTheta, refractionRatio) > RandFloatFromSeed(seed))
+	{
+		direction = Vec3Reflect(unitDirection, hitRecord->normal);
+	}
+	else
+	{
+		direction = Vec3Refract(unitDirection, hitRecord->normal, refractionRatio);
+	}
+
+	scattered->origin = hitRecord->p;
+	scattered->direction = direction;
+
+	return true;
+}
+
 // ===== SPHERE FUNCTIONS =====
 
 bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit)
@@ -375,6 +429,12 @@ float RandFloatFromSeed(ulong *seed)
 	return (float)(*seed >> 16) / 0xFFFFFFFF;
 }
 
+// ===== OTHER FUNCTIONS =====
+float DegToRad(float degrees)
+{
+	return degrees * (float)M_PI / 180.0f;
+}
+
 // ===== MAIN FUNCTION =====
 
 __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G, __global unsigned char *B, __global unsigned int *_randSeeds, __global int *_width, __global int *_height, __global int *_samplesPerPixel, __global int *_maxDepth)
@@ -405,14 +465,16 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 	Vec3 vertical = {0, viewportHeight, 0};
 	Vec3 lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(origin, FloatMulVec3(0.5, horizontal)), FloatMulVec3(0.5, vertical)), (Vec3){0, 0, focalLength});
 
-	Camera camera = {origin, horizontal, vertical, lowerLeftCorner, aspectRatio, viewportWidth, viewportHeight, focalLength};
+	Camera camera = { origin, horizontal, vertical, lowerLeftCorner };
 
-	Sphere spheres[5];
-	spheres[0] = (Sphere){(Vec3){ 0.0, -100.5, -1.0}, 100.0, (Material){(Vec3){0.0, 0.8, 0.7}, 0.0, 0}};
-	spheres[1] = (Sphere){(Vec3){ 0.0,    0.5, -1.0},   0.5, (Material){(Vec3){0.7, 0.3, 0.9}, 0.0, 0}};
-	spheres[2] = (Sphere){(Vec3){-0.9,    0.0, -1.0},   0.5, (Material){(Vec3){0.8, 0.5, 0.5}, 0.1, 1}};
-	spheres[3] = (Sphere){(Vec3){ 0.9,    0.0, -1.0},   0.5, (Material){(Vec3){0.8, 0.6, 0.2}, 0.5, 1}};
-	spheres[4] = (Sphere){(Vec3){ 0.0,   -0.3, -1.0},   0.2, (Material){(Vec3){0.8, 0.8, 0.8}, 0.0, 1}};
+	Sphere spheres[7];
+	spheres[0] = (Sphere){(Vec3){ 0.0, -100.5, -1.0}, 100.0, (Material){(Vec3){0.0, 0.8, 0.7}, 0.0, 0.0, 0}};
+	spheres[1] = (Sphere){(Vec3){ 0.0,    0.5, -1.0},   0.5, (Material){(Vec3){0.7, 0.3, 0.9}, 0.0, 0.0, 0}};
+	spheres[2] = (Sphere){(Vec3){-0.9,    0.0, -1.0},   0.5, (Material){(Vec3){0.8, 0.5, 0.5}, 0.1, 0.0, 1}};
+	spheres[3] = (Sphere){(Vec3){ 0.9,    0.0, -1.0},   0.5, (Material){(Vec3){0.8, 0.6, 0.2}, 0.5, 0.0, 1}};
+	spheres[4] = (Sphere){(Vec3){ 0.0,   -0.3, -1.0},   0.2, (Material){(Vec3){0.8, 0.8, 0.8}, 0.0, 0.0, 1}};
+	spheres[5] = (Sphere){(Vec3){ 0.2,   -0.4, -0.8},   0.1, (Material){(Vec3){0.8, 0.8, 0.8}, 0.0, 1.5, 2}};
+	spheres[6] = (Sphere){(Vec3){-0.2,   -0.4, -0.8},   0.1, (Material){(Vec3){0.8, 0.8, 0.8}, 0.0, 1.5, 2}};
 
 	Vec3 pixelColour = {0.0, 0.0, 0.0};
 
@@ -422,7 +484,7 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 		float v = ((float)(global_id / width) + RandFloatFromSeed(&seed)) / height;
 
 		Ray ray = GetRay(camera, u, v);
-		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, maxDepth, spheres, 5, &seed));
+		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, maxDepth, spheres, sizeof(spheres) / sizeof(Sphere), &seed));
 	}
 	
 	R[global_id] = pixelColour.x / samplesPerPixel * 255;
