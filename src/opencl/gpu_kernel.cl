@@ -456,14 +456,18 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 		seed = NextSeed(seed);
 	}
 
+	float vfov = 75.0f;
 	float aspectRatio = (float)width / (float)height;
-	float viewportHeight = 2.0;
+	float theta = DegToRad(vfov);
+	float h = tan(theta / 2);
+	float viewportHeight = 2.0f * h;
 	float viewportWidth = aspectRatio * viewportHeight;
-	float focalLength = 1.0;
-	Vec3 origin = {0, 0, 0};
-	Vec3 horizontal = {viewportWidth, 0, 0};
-	Vec3 vertical = {0, viewportHeight, 0};
-	Vec3 lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(origin, FloatMulVec3(0.5, horizontal)), FloatMulVec3(0.5, vertical)), (Vec3){0, 0, focalLength});
+	float focalLength = 1.0f;
+
+	Vec3 origin = { 0.0f, 0.0f, 0.0f };
+	Vec3 horizontal = { viewportWidth, 0.0f, 0.0f };
+	Vec3 vertical = { 0.0f, viewportHeight, 0.0f };
+	Vec3 lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(origin, FloatMulVec3(0.5f, horizontal)), FloatMulVec3(0.5f, vertical)), (Vec3){ 0.0f, 0.0f, focalLength });
 
 	Camera camera = { origin, horizontal, vertical, lowerLeftCorner };
 

@@ -8,7 +8,7 @@
 #define IMAGE_WIDTH 1280 // must be multiple of 128
 #define IMAGE_HEIGHT (int)(IMAGE_WIDTH / ASPECT_RATIO)
 #define BYTES_PER_PIXEL 3
-#define SAMPLES_PER_PIXEL 250
+#define SAMPLES_PER_PIXEL 512
 #define MAX_DEPTH 50
 
 #endif

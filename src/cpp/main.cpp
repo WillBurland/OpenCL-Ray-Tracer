@@ -74,7 +74,7 @@ int main()
 
 	printf("Building kernel...\n");
 	cl::Program program(context, sources);
-	if (program.build({defaultDevice}, "-cl-std=CL3.0") != CL_SUCCESS)
+	if (program.build({defaultDevice}) != CL_SUCCESS)
 	{
 		std::cout << "Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(defaultDevice) << std::endl;
 		return 0;
