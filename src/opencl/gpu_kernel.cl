@@ -49,7 +49,6 @@ Vec3 Vec3AddVec3(Vec3 a, Vec3 b);
 Vec3 Vec3SubVec3(Vec3 a, Vec3 b);
 Vec3 Vec3MulVec3(Vec3 a, Vec3 b);
 Vec3 Vec3MulFloat(Vec3 a, float b);
-Vec3 FloatMulVec3(float a, Vec3 b);
 Vec3 Vec3DivFloat(Vec3 a, float b);
 float Vec3LengthSquared(Vec3 a);
 float Vec3Length(Vec3 a);
@@ -103,15 +102,6 @@ Vec3 Vec3MulFloat(Vec3 a, float b)
 	result.x = a.x * b;
 	result.y = a.y * b;
 	result.z = a.z * b;
-	return result;
-}
-
-Vec3 FloatMulVec3(float a, Vec3 b)
-{
-	Vec3 result;
-	result.x = a * b.x;
-	result.y = a * b.y;
-	result.z = a * b.z;
 	return result;
 }
 
@@ -204,7 +194,7 @@ double Vec3Reflectance(double cosine, double refIdx)
 
 Vec3 RayAt(Ray ray, float t)
 {
-	return Vec3AddVec3(ray.origin, FloatMulVec3(t, ray.direction));
+	return Vec3AddVec3(ray.origin, Vec3MulFloat(ray.direction, t));
 }
 
 
@@ -212,7 +202,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, ulong *s
 {
 	Vec3 unitDirection = Vec3Unit(ray.direction);
 	float t = 0.5f * (unitDirection.y + 1.0f);
-	Vec3 skyColour = Vec3AddVec3(FloatMulVec3(1.0f - t, (Vec3){ 1.0f, 1.0f, 1.0f }), FloatMulVec3(t, (Vec3){ 0.5f, 0.7f, 1.0f }));
+	Vec3 skyColour = Vec3AddVec3(Vec3MulFloat((Vec3){ 1.0f, 1.0f, 1.0f }, 1.0f - t), Vec3MulFloat((Vec3){ 0.5f, 0.7f, 1.0f }, t));
 	Vec3 finalColour = skyColour;
 
 	int currentDepth = 0;
@@ -409,11 +399,11 @@ bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit)
 
 // ===== CAMERA FUNCTIONS =====
 
-Ray GetRay(Camera camera, float u, float v)
+Ray GetRay(Camera camera, float s, float t)
 {
 	Ray result;
 	result.origin = camera.origin;
-	result.direction = Vec3SubVec3(Vec3AddVec3(Vec3AddVec3(camera.lowerLeftCorner, FloatMulVec3(u, camera.horizontal)), FloatMulVec3(v, camera.vertical)), camera.origin);
+	result.direction = Vec3SubVec3(Vec3AddVec3(Vec3AddVec3(camera.lowerLeftCorner, Vec3MulFloat(camera.horizontal, s)), Vec3MulFloat(camera.vertical, t)), camera.origin);
 	return result;
 }
 
@@ -437,7 +427,7 @@ float DegToRad(float degrees)
 
 // ===== MAIN FUNCTION =====
 
-__kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G, __global unsigned char *B, __global unsigned int *_randSeeds, __global int *_width, __global int *_height, __global int *_samplesPerPixel, __global int *_maxDepth)
+__kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G, __global unsigned char *B, __global unsigned int *_randSeeds, __global int *_width, __global int *_height, __global int *_samplesPerPixel, __global int *_maxDepth, __global Camera *_camera)
 {
 	int global_id = get_global_id(0);
 	float tempR = 0;
@@ -456,28 +446,6 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 		seed = NextSeed(seed);
 	}
 
-	Vec3 lookFrom = { -2.0f, 1.5f, 3.0f };
-	Vec3 lookAt = { 0.0f, 0.0f, -1.0f };
-	Vec3 vUp = { 0.0f, 1.0f, 0.0f };
-	float vfov = 20.0f;
-	float aspectRatio = (float)width / (float)height;
-
-	float theta = DegToRad(vfov);
-	float h = tan(theta / 2);
-	float viewportHeight = 2.0f * h;
-	float viewportWidth = aspectRatio * viewportHeight;
-
-	Vec3 w = Vec3Unit(Vec3SubVec3(lookFrom, lookAt));
-	Vec3 u = Vec3Unit(Vec3Cross(vUp, w));
-	Vec3 v = Vec3Cross(w, u);
-	
-	Vec3 origin = lookFrom;
-	Vec3 horizontal = FloatMulVec3(viewportWidth, u);
-	Vec3 vertical = FloatMulVec3(viewportHeight, v);
-	Vec3 lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(origin, FloatMulVec3(0.5f, horizontal)), FloatMulVec3(0.5f, vertical)), w);
-
-	Camera camera = { origin, horizontal, vertical, lowerLeftCorner };
-
 	Sphere spheres[7];
 	spheres[0] = (Sphere){(Vec3){ 0.0, -100.5, -1.0}, 100.0, (Material){(Vec3){0.0, 0.8, 0.7}, 0.0, 0.0, 0}};
 	spheres[1] = (Sphere){(Vec3){ 0.0,    0.5, -1.0},   0.5, (Material){(Vec3){0.7, 0.3, 0.9}, 0.0, 0.0, 0}};
@@ -494,7 +462,7 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 		float u = ((float)(global_id % width) + RandFloatFromSeed(&seed)) / width;
 		float v = ((float)(global_id / width) + RandFloatFromSeed(&seed)) / height;
 
-		Ray ray = GetRay(camera, u, v);
+		Ray ray = GetRay(*_camera, u, v);
 		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, maxDepth, spheres, sizeof(spheres) / sizeof(Sphere), &seed));
 	}
 	

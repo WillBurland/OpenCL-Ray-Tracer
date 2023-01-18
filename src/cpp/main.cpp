@@ -1,19 +1,31 @@
 #include <chrono>
-#include <stdio.h>
 #include <iostream>
 #include <fstream>
-#include <cstdlib>
-#include <ctime>
-
-#define CL_HPP_TARGET_OPENCL_VERSION 300
-#include <CL/opencl.hpp>
 
 #include "bitmap_io.hpp"
+#include "cl_vec3.hpp"
 #include "colour.hpp"
 #include "globals.hpp"
 #include "vec3.hpp"
 
 unsigned char image[IMAGE_WIDTH][IMAGE_HEIGHT][BYTES_PER_PIXEL];
+
+void CalculateCamera(CLCamera *camera, CLVec3 lookFrom, CLVec3 lookAt, CLVec3 vUp, float vfov, float aspectRatio)
+{
+	float theta = vfov * (float)3.141592654 / 180.0f;
+	float h = tan(theta / 2);
+	float viewportHeight = 2.0f * h;
+	float viewportWidth = aspectRatio * viewportHeight;
+
+	CLVec3 w = Vec3Unit(Vec3SubVec3(lookFrom, lookAt));
+	CLVec3 u = Vec3Unit(Vec3Cross(vUp, w));
+	CLVec3 v = Vec3Cross(w, u);
+
+	camera->origin = lookFrom;
+	camera->horizontal = Vec3MulFloat(u, viewportWidth);
+	camera->vertical = Vec3MulFloat(v, viewportHeight);
+	camera->lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(camera->origin, Vec3DivFloat(camera->horizontal, 2)), Vec3DivFloat(camera->vertical, 2)), w);
+}
 
 int main()
 {
@@ -79,6 +91,16 @@ int main()
 	int *imageDataSamplesPerPixel = (int*)malloc(sizeof(int));
 	int *imageDataMaxDepth = (int*)malloc(sizeof(int));
 
+	CLCamera *camera = (CLCamera*)malloc(sizeof(CLCamera));
+	CalculateCamera(
+		camera,
+		CLVec3{ -2.5f, 1.5f,  3.5f },
+		CLVec3{  0.2f, 0.0f, -1.5f },
+		CLVec3{  0.0f, 1.0f,  0.0f },
+		20.0f,
+		ASPECT_RATIO
+	);
+
 	imageDataWidth[0] = IMAGE_WIDTH;
 	imageDataHeight[0] = IMAGE_HEIGHT;
 	imageDataSamplesPerPixel[0] = SAMPLES_PER_PIXEL;
@@ -115,6 +137,7 @@ int main()
 	cl::Buffer bufferHeight(context, CL_MEM_READ_ONLY, sizeof(int));
 	cl::Buffer bufferSamplesPerPixel(context, CL_MEM_READ_ONLY, sizeof(int));
 	cl::Buffer bufferMaxDepth(context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer bufferCamera(context, CL_MEM_READ_ONLY, sizeof(CLCamera));
 
 	cl::CommandQueue queue(context, defaultDevice);
 
@@ -127,6 +150,7 @@ int main()
 	queue.enqueueWriteBuffer(bufferHeight, CL_TRUE, 0, sizeof(int), imageDataHeight);
 	queue.enqueueWriteBuffer(bufferSamplesPerPixel, CL_TRUE, 0, sizeof(int), imageDataSamplesPerPixel);
 	queue.enqueueWriteBuffer(bufferMaxDepth, CL_TRUE, 0, sizeof(int), imageDataMaxDepth);
+	queue.enqueueWriteBuffer(bufferCamera, CL_TRUE, 0, sizeof(CLCamera), camera);
 
 	printf("Setting kernel arguments...\n");
 	cl::Kernel kernel(program, "pixel_colour");
@@ -150,6 +174,7 @@ int main()
 	kernel.setArg(5, bufferHeight);
 	kernel.setArg(6, bufferSamplesPerPixel);
 	kernel.setArg(7, bufferMaxDepth);
+	kernel.setArg(8, bufferCamera);
 
 	std::chrono::steady_clock::time_point endKernel = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
@@ -160,7 +185,16 @@ int main()
 	printf("Work groups to use: %d\n", (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize);
 	printf(" === Done ===\n\n");
 
-	printf(" === Rendering ===\nGPU memory usage: %d MB\n", (
+	// output kernel memory usage
+	cl_ulong kernelMemoryUsage = 0;
+	err = kernel.getWorkGroupInfo(defaultDevice, CL_KERNEL_PRIVATE_MEM_SIZE, &kernelMemoryUsage);
+	if (err != CL_SUCCESS)
+	{
+		std::cout << "Could not get kernel memory usage: " << err << std::endl;
+		return -1;
+	}
+
+	printf(" === Rendering ===\nGPU memory usage: %d KB\n", (
 		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned char) + // imageBufferR
 		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned char) + // imageBufferG
 		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned char) + // imageBufferB
@@ -168,9 +202,9 @@ int main()
 		sizeof(int) + // widthBuffer
 		sizeof(int) + // heightBuffer
 		sizeof(int) + // samplesPerPixelBuffer
-		sizeof(int) +  // maxDepthBuffer
-		336 * IMAGE_WIDTH * IMAGE_HEIGHT // internal kernel memory
-	) / 1024 / 1024);
+		sizeof(int) + // maxDepthBuffer
+		kernelMemoryUsage * (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize // kernel memory usage
+	) / 1024);
 	
 	printf("Running kernel...\n");
 	std::chrono::steady_clock::time_point beginRender = std::chrono::steady_clock::now();
