@@ -22,20 +22,46 @@ int main()
 	char* imageFileName = (char*)"output.bmp";
 	char* kernelFileName = (char*)"gpu_kernel.cl";
 
-	printf("\n === System info ===\n");
+	cl_int err;
+
+	printf("\n === Device list ===\n");
+
+	std::vector<cl::Device> devices;
+    std::vector<cl::Platform> platforms;
+    std::vector<cl::Device> devices_available;
+    int n = 0;
+    cl::Platform::get(&platforms);
+    for (int i = 0; i < (int)platforms.size(); i++)
+	{
+        devices_available.clear();
+        platforms[i].getDevices(CL_DEVICE_TYPE_ALL, &devices_available);
+        if(devices_available.size() == 0)
+			continue;
+        for (int j = 0; j < (int)devices_available.size(); j++)
+		{
+            n++;
+            devices.push_back(devices_available[j]);
+        }
+    }
+
+    if (platforms.size() ==  0|| devices.size() == 0)
+	{
+        std::cout << "Error: There are no OpenCL devices available" << std::endl;
+        return -1;
+    }
+
+    for (int i = 0; i < n; i++)
+	{
+		printf("ID: %d, Device: %s\n", i, devices[i].getInfo<CL_DEVICE_NAME>().c_str());
+	}
 
 	cl::Platform defaultPlatform = cl::Platform::getDefault();
-	std::cout << "Using platform: " << defaultPlatform.getInfo<CL_PLATFORM_NAME>() << std::endl;
+	printf("\nUsing platform: %s\n", defaultPlatform.getInfo<CL_PLATFORM_NAME>().c_str());
 
 	cl::Device defaultDevice = cl::Device::getDefault();
-	std::cout << "Using device: " << defaultDevice.getInfo<CL_DEVICE_NAME>() << std::endl;
-	
-	printf("Global work size: %d\n", IMAGE_WIDTH * IMAGE_HEIGHT);
-	printf("Max work item dimensions: %d\n", defaultDevice.getInfo<CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS>());
-	auto sizes = defaultDevice.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
-	printf("Max work item sizes: %d, %d, %d\n", sizes[0], sizes[1], sizes[2]);
-	printf("Max work group size: %d\n", defaultDevice.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>());
-	printf("Work groups to use: %d\n", (IMAGE_WIDTH * IMAGE_HEIGHT) / defaultDevice.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>());
+	printf("Using device: %s\n", defaultDevice.getInfo<CL_DEVICE_NAME>().c_str());
+
+	printf("OpenCL support: %s\n", defaultDevice.getInfo<CL_DEVICE_OPENCL_C_VERSION>().c_str());
 
 	printf(" === Done ===\n");
 
@@ -105,7 +131,16 @@ int main()
 	printf("Setting kernel arguments...\n");
 	cl::Kernel kernel(program, "pixel_colour");
 	cl::NDRange global(IMAGE_WIDTH * IMAGE_HEIGHT); // amount of pixels to process
-	cl::NDRange local(defaultDevice.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>()); // max threads gpu can use
+
+	size_t workGroupSize;
+	err = kernel.getWorkGroupInfo(defaultDevice, CL_KERNEL_WORK_GROUP_SIZE, &workGroupSize);
+	if (err != CL_SUCCESS)
+	{
+		std::cout << "Could not get work group size: " << err << std::endl;
+		return -1;
+	}
+
+	cl::NDRange local(workGroupSize); // amount of pixels to process per work group
 
 	kernel.setArg(0, bufferR);
 	kernel.setArg(1, bufferG);
@@ -117,7 +152,13 @@ int main()
 	kernel.setArg(7, bufferMaxDepth);
 
 	std::chrono::steady_clock::time_point endKernel = std::chrono::steady_clock::now();
-	printf(" === Done in %f s ===\n\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
+	printf(" === Done in %f s ===\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
+
+	printf("\n === Job info ===\n");
+	printf("Global work size: %d\n", IMAGE_WIDTH * IMAGE_HEIGHT);
+	printf("Work group size: %d\n", workGroupSize);
+	printf("Work groups to use: %d\n", (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize);
+	printf(" === Done ===\n\n");
 
 	printf(" === Rendering ===\nGPU memory usage: %d MB\n", (
 		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned char) + // imageBufferR
@@ -133,7 +174,12 @@ int main()
 	
 	printf("Running kernel...\n");
 	std::chrono::steady_clock::time_point beginRender = std::chrono::steady_clock::now();
-	queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local);
+	err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local);
+	if (err != CL_SUCCESS)
+	{
+		std::cout << "Could not run kernel: " << err << std::endl;
+		return -1;
+	}
 	
 	queue.enqueueReadBuffer(bufferR, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT, imageDataR);
 	printf("Reading GPU memory...\n");

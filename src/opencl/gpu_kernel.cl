@@ -451,23 +451,30 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 
 	ulong seed = _randSeeds[global_id];
 
-	for (int i = 0; i < 1024; i++)
+	for (int i = 0; i < 128; i++)
 	{
 		seed = NextSeed(seed);
 	}
 
-	float vfov = 75.0f;
+	Vec3 lookFrom = { -2.0f, 1.5f, 3.0f };
+	Vec3 lookAt = { 0.0f, 0.0f, -1.0f };
+	Vec3 vUp = { 0.0f, 1.0f, 0.0f };
+	float vfov = 20.0f;
 	float aspectRatio = (float)width / (float)height;
+
 	float theta = DegToRad(vfov);
 	float h = tan(theta / 2);
 	float viewportHeight = 2.0f * h;
 	float viewportWidth = aspectRatio * viewportHeight;
-	float focalLength = 1.0f;
 
-	Vec3 origin = { 0.0f, 0.0f, 0.0f };
-	Vec3 horizontal = { viewportWidth, 0.0f, 0.0f };
-	Vec3 vertical = { 0.0f, viewportHeight, 0.0f };
-	Vec3 lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(origin, FloatMulVec3(0.5f, horizontal)), FloatMulVec3(0.5f, vertical)), (Vec3){ 0.0f, 0.0f, focalLength });
+	Vec3 w = Vec3Unit(Vec3SubVec3(lookFrom, lookAt));
+	Vec3 u = Vec3Unit(Vec3Cross(vUp, w));
+	Vec3 v = Vec3Cross(w, u);
+	
+	Vec3 origin = lookFrom;
+	Vec3 horizontal = FloatMulVec3(viewportWidth, u);
+	Vec3 vertical = FloatMulVec3(viewportHeight, v);
+	Vec3 lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(origin, FloatMulVec3(0.5f, horizontal)), FloatMulVec3(0.5f, vertical)), w);
 
 	Camera camera = { origin, horizontal, vertical, lowerLeftCorner };
 
