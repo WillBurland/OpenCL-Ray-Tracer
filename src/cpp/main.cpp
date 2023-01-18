@@ -3,29 +3,13 @@
 #include <fstream>
 
 #include "bitmap_io.hpp"
+#include "cl_sphere.hpp"
 #include "cl_vec3.hpp"
 #include "colour.hpp"
 #include "globals.hpp"
 #include "vec3.hpp"
 
 unsigned char image[IMAGE_WIDTH][IMAGE_HEIGHT][BYTES_PER_PIXEL];
-
-void CalculateCamera(CLCamera *camera, CLVec3 lookFrom, CLVec3 lookAt, CLVec3 vUp, float vfov, float aspectRatio)
-{
-	float theta = vfov * (float)3.141592654 / 180.0f;
-	float h = tan(theta / 2);
-	float viewportHeight = 2.0f * h;
-	float viewportWidth = aspectRatio * viewportHeight;
-
-	CLVec3 w = Vec3Unit(Vec3SubVec3(lookFrom, lookAt));
-	CLVec3 u = Vec3Unit(Vec3Cross(vUp, w));
-	CLVec3 v = Vec3Cross(w, u);
-
-	camera->origin = lookFrom;
-	camera->horizontal = Vec3MulFloat(u, viewportWidth);
-	camera->vertical = Vec3MulFloat(v, viewportHeight);
-	camera->lowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(camera->origin, Vec3DivFloat(camera->horizontal, 2)), Vec3DivFloat(camera->vertical, 2)), w);
-}
 
 int main()
 {
@@ -101,6 +85,16 @@ int main()
 		ASPECT_RATIO
 	);
 
+	cl_int numSpheres = 7;
+	CLSphere *spheres = (CLSphere*)malloc(numSpheres * sizeof(CLSphere));
+	spheres[0] = CreateSphere(CreateVec3( 0.0f, -100.5f, -1.0f), 100.0f, CreateMaterial(CreateVec3(0.0f, 0.8f, 0.7f), 0.0f, 0.0f, 0));
+	spheres[1] = CreateSphere(CreateVec3( 0.0f,    0.5f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.7f, 0.3f, 0.9f), 0.0f, 0.0f, 0));
+	spheres[2] = CreateSphere(CreateVec3(-0.9f,    0.0f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.1f, 0.0f, 1));
+	spheres[3] = CreateSphere(CreateVec3( 0.9f,    0.0f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1));
+	spheres[4] = CreateSphere(CreateVec3( 0.0f,   -0.3f, -1.0f),   0.2f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
+	spheres[5] = CreateSphere(CreateVec3( 0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
+	spheres[6] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
+
 	imageDataWidth[0] = IMAGE_WIDTH;
 	imageDataHeight[0] = IMAGE_HEIGHT;
 	imageDataSamplesPerPixel[0] = SAMPLES_PER_PIXEL;
@@ -138,6 +132,8 @@ int main()
 	cl::Buffer bufferSamplesPerPixel(context, CL_MEM_READ_ONLY, sizeof(int));
 	cl::Buffer bufferMaxDepth(context, CL_MEM_READ_ONLY, sizeof(int));
 	cl::Buffer bufferCamera(context, CL_MEM_READ_ONLY, sizeof(CLCamera));
+	cl::Buffer bufferSpheres(context, CL_MEM_READ_ONLY, numSpheres * sizeof(CLSphere));
+	cl::Buffer bufferNumSpheres(context, CL_MEM_READ_ONLY, sizeof(int));
 
 	cl::CommandQueue queue(context, defaultDevice);
 
@@ -151,6 +147,8 @@ int main()
 	queue.enqueueWriteBuffer(bufferSamplesPerPixel, CL_TRUE, 0, sizeof(int), imageDataSamplesPerPixel);
 	queue.enqueueWriteBuffer(bufferMaxDepth, CL_TRUE, 0, sizeof(int), imageDataMaxDepth);
 	queue.enqueueWriteBuffer(bufferCamera, CL_TRUE, 0, sizeof(CLCamera), camera);
+	queue.enqueueWriteBuffer(bufferSpheres, CL_TRUE, 0, numSpheres * sizeof(CLSphere), spheres);
+	queue.enqueueWriteBuffer(bufferNumSpheres, CL_TRUE, 0, sizeof(int), &numSpheres);
 
 	printf("Setting kernel arguments...\n");
 	cl::Kernel kernel(program, "pixel_colour");
@@ -175,6 +173,8 @@ int main()
 	kernel.setArg(6, bufferSamplesPerPixel);
 	kernel.setArg(7, bufferMaxDepth);
 	kernel.setArg(8, bufferCamera);
+	kernel.setArg(9, bufferSpheres);
+	kernel.setArg(10, bufferNumSpheres);
 
 	std::chrono::steady_clock::time_point endKernel = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
@@ -203,6 +203,9 @@ int main()
 		sizeof(int) + // heightBuffer
 		sizeof(int) + // samplesPerPixelBuffer
 		sizeof(int) + // maxDepthBuffer
+		sizeof(CLCamera) + // cameraBuffer
+		numSpheres * sizeof(CLSphere) + // spheresBuffer
+		sizeof(int) + // numSpheresBuffer
 		kernelMemoryUsage * (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize // kernel memory usage
 	) / 1024);
 	

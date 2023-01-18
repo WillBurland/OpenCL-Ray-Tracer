@@ -427,7 +427,7 @@ float DegToRad(float degrees)
 
 // ===== MAIN FUNCTION =====
 
-__kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G, __global unsigned char *B, __global unsigned int *_randSeeds, __global int *_width, __global int *_height, __global int *_samplesPerPixel, __global int *_maxDepth, __global Camera *_camera)
+__kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G, __global unsigned char *B, __global unsigned int *_randSeeds, __global int *_width, __global int *_height, __global int *_samplesPerPixel, __global int *_maxDepth, __global Camera *_camera, __global Sphere *_spheres, __global int *_sphereCount)
 {
 	int global_id = get_global_id(0);
 	float tempR = 0;
@@ -441,20 +441,6 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 
 	ulong seed = _randSeeds[global_id];
 
-	for (int i = 0; i < 128; i++)
-	{
-		seed = NextSeed(seed);
-	}
-
-	Sphere spheres[7];
-	spheres[0] = (Sphere){(Vec3){ 0.0, -100.5, -1.0}, 100.0, (Material){(Vec3){0.0, 0.8, 0.7}, 0.0, 0.0, 0}};
-	spheres[1] = (Sphere){(Vec3){ 0.0,    0.5, -1.0},   0.5, (Material){(Vec3){0.7, 0.3, 0.9}, 0.0, 0.0, 0}};
-	spheres[2] = (Sphere){(Vec3){-0.9,    0.0, -1.0},   0.5, (Material){(Vec3){0.8, 0.5, 0.5}, 0.1, 0.0, 1}};
-	spheres[3] = (Sphere){(Vec3){ 0.9,    0.0, -1.0},   0.5, (Material){(Vec3){0.8, 0.6, 0.2}, 0.5, 0.0, 1}};
-	spheres[4] = (Sphere){(Vec3){ 0.0,   -0.3, -1.0},   0.2, (Material){(Vec3){0.8, 0.8, 0.8}, 0.0, 0.0, 1}};
-	spheres[5] = (Sphere){(Vec3){ 0.2,   -0.4, -0.8},   0.1, (Material){(Vec3){0.8, 0.8, 0.8}, 0.0, 1.5, 2}};
-	spheres[6] = (Sphere){(Vec3){-0.2,   -0.4, -0.8},   0.1, (Material){(Vec3){0.8, 0.8, 0.8}, 0.0, 1.5, 2}};
-
 	Vec3 pixelColour = {0.0, 0.0, 0.0};
 
 	for (int i = 0; i < samplesPerPixel; i++)
@@ -463,7 +449,7 @@ __kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G,
 		float v = ((float)(global_id / width) + RandFloatFromSeed(&seed)) / height;
 
 		Ray ray = GetRay(*_camera, u, v);
-		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, maxDepth, spheres, sizeof(spheres) / sizeof(Sphere), &seed));
+		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, maxDepth, _spheres, *_sphereCount, &seed));
 	}
 	
 	R[global_id] = pixelColour.x / samplesPerPixel * 255;

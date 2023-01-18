@@ -27,5 +27,7 @@ CLVec3 Vec3Cross(CLVec3 a, CLVec3 b);
 float Vec3LengthSquared(CLVec3 a);
 float Vec3Length(CLVec3 a);
 CLVec3 Vec3Unit(CLVec3 a);
+CLVec3 CreateVec3(float x, float y, float z);
+void CalculateCamera(CLCamera *camera, CLVec3 lookFrom, CLVec3 lookAt, CLVec3 vUp, float vfov, float aspectRatio);
 
 #endif

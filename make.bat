@@ -13,6 +13,7 @@ echo Building...
 g++ -std=c++17 -O2 ^
 ../src/cpp/main.cpp ^
 ../src/cpp/bitmap_io.cpp ^
+../src/cpp/cl_sphere.cpp ^
 ../src/cpp/cl_vec3.cpp ^
 ../src/cpp/colour.cpp ^
 ../src/cpp/vec3.cpp ^
