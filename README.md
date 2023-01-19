@@ -43,7 +43,10 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 
 ## To-do
 
-- Splitting the render area into blocks/chunks, would use less memory, maybe a tiny performance hit
+- Cube support
+- Triangle mesh support
+- Texture support
+- Light material support
 
 ## Notes
 
