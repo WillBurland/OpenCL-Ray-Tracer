@@ -18,6 +18,10 @@ typedef struct
 	CLVec3 horizontal;
 	CLVec3 vertical;
 	CLVec3 lowerLeftCorner;
+	cl_int width;
+	cl_int height;
+	cl_int samplesPerPixel;
+	cl_int maxDepth;
 } CLCamera;
 
 CLVec3 Vec3SubVec3(CLVec3 a, CLVec3 b);

@@ -41,6 +41,10 @@ typedef struct
 	Vec3 horizontal;
 	Vec3 vertical;
 	Vec3 lowerLeftCorner;
+	int width;
+	int height;
+	int samplesPerPixel;
+	int maxDepth;
 } Camera;
 
 // ===== FUNCTION DEFINITIONS =====
@@ -424,32 +428,26 @@ float DegToRad(float degrees)
 
 // ===== MAIN FUNCTION =====
 
-__kernel void pixel_colour(__global unsigned char *R, __global unsigned char *G, __global unsigned char *B, __global unsigned int *_randSeeds, __constant int *_width, __constant int *_height, __constant int *_samplesPerPixel, __constant int *_maxDepth, __constant Camera *_camera, __global Sphere *_spheres, __constant int *_sphereCount)
+__kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds, __constant Camera *_camera, __global Sphere *_spheres, __constant int *_sphereCount)
 {
 	int global_id = get_global_id(0);
 
 	ulong seed = _randSeeds[global_id];
 
-	int width = *_width;
-	int height = *_height;
-	int samplesPerPixel = *_samplesPerPixel;
-	int maxDepth = *_maxDepth;
 	Camera camera = *_camera;
 	Sphere *spheres = _spheres;
 	int sphereCount = *_sphereCount;
 
 	Vec3 pixelColour = {0.0, 0.0, 0.0};
 
-	for (int i = 0; i < samplesPerPixel; i++)
+	for (int i = 0; i < camera.samplesPerPixel; i++)
 	{
-		float u = ((float)(global_id % width) + RandFloatFromSeed(&seed)) / width;
-		float v = ((float)(global_id / width) + RandFloatFromSeed(&seed)) / height;
+		float u = ((float)(global_id % camera.width) + RandFloatFromSeed(&seed)) / camera.width;
+		float v = ((float)(global_id / camera.width) + RandFloatFromSeed(&seed)) / camera.height;
 
 		Ray ray = GetRay(camera, u, v);
-		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, maxDepth, spheres, sphereCount, &seed));
+		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, camera.maxDepth, spheres, sphereCount, &seed));
 	}
 	
-	R[global_id] = pixelColour.x / samplesPerPixel * 255;
-	G[global_id] = pixelColour.y / samplesPerPixel * 255;
-	B[global_id] = pixelColour.z / samplesPerPixel * 255;
+	RGB[global_id] = Vec3DivFloat(pixelColour, camera.samplesPerPixel / 255.0f);
 }

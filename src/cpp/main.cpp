@@ -66,9 +66,7 @@ int main()
 	std::chrono::steady_clock::time_point beginKernel = std::chrono::steady_clock::now();
 	printf("\n === Compiling kernel ===\n");
 
-	unsigned char *imageDataR = (unsigned char*)malloc(IMAGE_WIDTH * IMAGE_HEIGHT);
-	unsigned char *imageDataG = (unsigned char*)malloc(IMAGE_WIDTH * IMAGE_HEIGHT);
-	unsigned char *imageDataB = (unsigned char*)malloc(IMAGE_WIDTH * IMAGE_HEIGHT);
+	CLVec3 *imageData = (CLVec3*)malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3));
 	unsigned int *randomSeeds = (unsigned int*)malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned int));
 	int *imageDataWidth = (int*)malloc(sizeof(int));
 	int *imageDataHeight = (int*)malloc(sizeof(int));
@@ -84,6 +82,10 @@ int main()
 		20.0f,
 		ASPECT_RATIO
 	);
+	camera->width = IMAGE_WIDTH;
+	camera->height = IMAGE_HEIGHT;
+	camera->samplesPerPixel = SAMPLES_PER_PIXEL;
+	camera->maxDepth = MAX_DEPTH;
 
 	cl_int numSpheres = 7;
 	CLSphere *spheres = (CLSphere*)malloc(numSpheres * sizeof(CLSphere));
@@ -123,14 +125,8 @@ int main()
 	}
 
 	printf("Allocating GPU memory...\n");
-	cl::Buffer bufferR(context, CL_MEM_WRITE_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT);
-	cl::Buffer bufferG(context, CL_MEM_WRITE_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT);
-	cl::Buffer bufferB(context, CL_MEM_WRITE_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT);
+	cl::Buffer bufferImageData(context, CL_MEM_WRITE_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3));
 	cl::Buffer bufferRandomSeeds(context, CL_MEM_READ_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned int));
-	cl::Buffer bufferWidth(context, CL_MEM_READ_ONLY, sizeof(int));
-	cl::Buffer bufferHeight(context, CL_MEM_READ_ONLY, sizeof(int));
-	cl::Buffer bufferSamplesPerPixel(context, CL_MEM_READ_ONLY, sizeof(int));
-	cl::Buffer bufferMaxDepth(context, CL_MEM_READ_ONLY, sizeof(int));
 	cl::Buffer bufferCamera(context, CL_MEM_READ_ONLY, sizeof(CLCamera));
 	cl::Buffer bufferSpheres(context, CL_MEM_READ_ONLY, numSpheres * sizeof(CLSphere));
 	cl::Buffer bufferNumSpheres(context, CL_MEM_READ_ONLY, sizeof(int));
@@ -138,14 +134,8 @@ int main()
 	cl::CommandQueue queue(context, defaultDevice);
 
 	printf("Writing to GPU memory...\n");
-	queue.enqueueWriteBuffer(bufferR, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT, imageDataR);
-	queue.enqueueWriteBuffer(bufferG, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT, imageDataG);
-	queue.enqueueWriteBuffer(bufferB, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT, imageDataB);
+	queue.enqueueWriteBuffer(bufferImageData, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3), imageData);
 	queue.enqueueWriteBuffer(bufferRandomSeeds, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned int), randomSeeds);
-	queue.enqueueWriteBuffer(bufferWidth, CL_TRUE, 0, sizeof(int), imageDataWidth);
-	queue.enqueueWriteBuffer(bufferHeight, CL_TRUE, 0, sizeof(int), imageDataHeight);
-	queue.enqueueWriteBuffer(bufferSamplesPerPixel, CL_TRUE, 0, sizeof(int), imageDataSamplesPerPixel);
-	queue.enqueueWriteBuffer(bufferMaxDepth, CL_TRUE, 0, sizeof(int), imageDataMaxDepth);
 	queue.enqueueWriteBuffer(bufferCamera, CL_TRUE, 0, sizeof(CLCamera), camera);
 	queue.enqueueWriteBuffer(bufferSpheres, CL_TRUE, 0, numSpheres * sizeof(CLSphere), spheres);
 	queue.enqueueWriteBuffer(bufferNumSpheres, CL_TRUE, 0, sizeof(int), &numSpheres);
@@ -164,17 +154,11 @@ int main()
 
 	cl::NDRange local(workGroupSize); // amount of pixels to process per work group
 
-	kernel.setArg(0, bufferR);
-	kernel.setArg(1, bufferG);
-	kernel.setArg(2, bufferB);
-	kernel.setArg(3, bufferRandomSeeds);
-	kernel.setArg(4, bufferWidth);
-	kernel.setArg(5, bufferHeight);
-	kernel.setArg(6, bufferSamplesPerPixel);
-	kernel.setArg(7, bufferMaxDepth);
-	kernel.setArg(8, bufferCamera);
-	kernel.setArg(9, bufferSpheres);
-	kernel.setArg(10, bufferNumSpheres);
+	kernel.setArg(0, bufferImageData);
+	kernel.setArg(1, bufferRandomSeeds);
+	kernel.setArg(2, bufferCamera);
+	kernel.setArg(3, bufferSpheres);
+	kernel.setArg(4, bufferNumSpheres);
 
 	std::chrono::steady_clock::time_point endKernel = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
@@ -195,14 +179,8 @@ int main()
 	}
 
 	printf(" === Rendering ===\nGPU memory usage: %d KB\n", (
-		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned char) + // imageBufferR
-		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned char) + // imageBufferG
-		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned char) + // imageBufferB
+		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3) + // imageDataBuffer
 		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned int) + // randomSeeds
-		sizeof(int) + // widthBuffer
-		sizeof(int) + // heightBuffer
-		sizeof(int) + // samplesPerPixelBuffer
-		sizeof(int) + // maxDepthBuffer
 		sizeof(CLCamera) + // cameraBuffer
 		numSpheres * sizeof(CLSphere) + // spheresBuffer
 		sizeof(int) + // numSpheresBuffer
@@ -218,10 +196,8 @@ int main()
 		return -1;
 	}
 	
-	queue.enqueueReadBuffer(bufferR, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT, imageDataR);
+	queue.enqueueReadBuffer(bufferImageData, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3), imageData);
 	printf("Reading GPU memory...\n");
-	queue.enqueueReadBuffer(bufferG, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT, imageDataG);
-	queue.enqueueReadBuffer(bufferB, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT, imageDataB);
 
 	printf("Cleaning up...\n");
 	queue.flush();
@@ -234,9 +210,9 @@ int main()
 		for (int j = 0; j < IMAGE_WIDTH; j++)
 		{
 			Colour pixelColour(
-				imageDataR[i * IMAGE_WIDTH + j],
-				imageDataG[i * IMAGE_WIDTH + j],
-				imageDataB[i * IMAGE_WIDTH + j]);
+				imageData[i * IMAGE_WIDTH + j].x,
+				imageData[i * IMAGE_WIDTH + j].y,
+				imageData[i * IMAGE_WIDTH + j].z);
 			WriteColour(i, j, IMAGE_WIDTH, IMAGE_HEIGHT, pixelColour);
 		}
 		
