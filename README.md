@@ -8,6 +8,10 @@ Build on top of [Ray-Tracer-Legacy](https://github.com/Will1162/Ray-Tracer-Legac
 
 The inspiration and general implementation techniques came from Peter Shirley's [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html). As development platforms varied, I had to find ways to adapt Peter's code to work with my own codebase, especially as OpenCL does not yet support C++ features such as classes, as it is based on C99.
 
+## Sample image from a recent commit
+
+![output](https://user-images.githubusercontent.com/39223201/230485152-3de165af-2439-4949-b5ce-de8ad004f0a6.png)
+
 ## Comparison to Legacy-Ray-Tracer
 
 ### Output variables
@@ -43,15 +47,14 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 
 ## To-do
 
-- Cube support
-- Triangle mesh support
 - Texture support
-- Light material support
+- Emissive material support
 
 ## Notes
 
 - Output resolution width must be a multiple of 128 (unsure as of *exactly* why)
 
-## Sources
+## References & Inspiration
 
 - [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html) by Peter Shirley
+- [Coding Adventure: Ray Tracing](https://www.youtube.com/watch?v=Qz0KTGYJtUk) by Sebastian Lague
