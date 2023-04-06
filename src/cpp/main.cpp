@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <fstream>
@@ -75,7 +76,7 @@ int main()
 	int *imageDataHeight = (int*)malloc(sizeof(int));
 	int *imageDataSamplesPerPixel = (int*)malloc(sizeof(int));
 	int *imageDataMaxDepth = (int*)malloc(sizeof(int));
-	
+
 
 	CLCamera *camera = (CLCamera*)malloc(sizeof(CLCamera));
 	CalculateCamera(
@@ -104,9 +105,9 @@ int main()
 
 	int numVertices = 0;
 	cl_int numTriangles = 0;
-	std::ifstream infile("cube.obj");
-	CLVec3 transform = CreateVec3(0.5f, -0.55f, -1.5f);
-	CLVec3 scale = CreateVec3(1.0f, 1.0f, 1.0f);
+	std::ifstream infile("burger.obj");
+	CLVec3 transform = CreateVec3(1.0f, -0.5f, -1.0f);
+	CLVec3 scale = CreateVec3(0.1f, 0.1f, 0.1f);
 
 	std::string line;
 	while (std::getline(infile, line))
@@ -153,44 +154,43 @@ int main()
 		else if (type == "f")
 		{
 			int a, b, c;
-
 			std::string faceLine = line.c_str();
-			int numSpaces = 0;
-			for (int i = 0; i < faceLine.length(); i++)
+
+			faceLine.erase(0, 2);
+			std::replace(faceLine.begin(), faceLine.end(), ' ', '/');
+
+			std::vector<std::string> tokens;
+			std::string token;
+			std::istringstream tokenStream(faceLine);
+			while (std::getline(tokenStream, token, '/'))
 			{
-				if (faceLine[i] == ' ')
-				{
-					if (faceLine[i+1] != ' ')
-					{
-						numSpaces++;
-						
-						if (numSpaces == 1)
-						{
-							a = (int)faceLine[i+1] - 48;
-						}
-						else if (numSpaces == 2)
-						{
-							b = (int)faceLine[i+1] - 48;
-							
-						}
-						else if (numSpaces == 3)
-						{
-							c = (int)faceLine[i+1] - 48;
-						}
-					}
-					
-				}
+				tokens.push_back(token);
 			}
-			
+
+			int start = 1;
+			int change = 4;
+			if (tokens.size() == 9)
+			{
+				start = 0;
+				change = 3;
+			}
+
+			a = std::stoi(tokens[start + change * 0]);
+			b = std::stoi(tokens[start + change * 1]);
+			c = std::stoi(tokens[start + change * 2]);
+
 			triangles[currentFace] = CreateTriangle(
 				vertices[a - 1],
 				vertices[b - 1],
 				vertices[c - 1],
 				CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1)
 			);
+
 			currentFace++;
 		}
 	}
+
+	infile.close();
 
 
 	imageDataWidth[0] = IMAGE_WIDTH;
