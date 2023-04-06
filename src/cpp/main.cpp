@@ -1,6 +1,8 @@
 #include <chrono>
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#include <string>
 
 #include "bitmap_io.hpp"
 #include "cl_triangle.hpp"
@@ -73,6 +75,7 @@ int main()
 	int *imageDataHeight = (int*)malloc(sizeof(int));
 	int *imageDataSamplesPerPixel = (int*)malloc(sizeof(int));
 	int *imageDataMaxDepth = (int*)malloc(sizeof(int));
+	
 
 	CLCamera *camera = (CLCamera*)malloc(sizeof(CLCamera));
 	CalculateCamera(
@@ -88,24 +91,107 @@ int main()
 	camera->samplesPerPixel = SAMPLES_PER_PIXEL;
 	camera->maxDepth = MAX_DEPTH;
 
-	cl_int numSpheres = 7;
+
+	cl_int numSpheres = 6;
 	CLSphere *spheres = (CLSphere*)malloc(numSpheres * sizeof(CLSphere));
 	spheres[0] = CreateSphere(CreateVec3( 0.0f, -100.5f, -1.0f), 100.0f, CreateMaterial(CreateVec3(0.0f, 0.8f, 0.7f), 0.0f, 0.0f, 0));
 	spheres[1] = CreateSphere(CreateVec3( 0.0f,    0.5f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.7f, 0.3f, 0.9f), 0.0f, 0.0f, 0));
 	spheres[2] = CreateSphere(CreateVec3(-0.9f,    0.0f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.1f, 0.0f, 1));
-	spheres[3] = CreateSphere(CreateVec3( 0.9f,    0.0f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1));
-	spheres[4] = CreateSphere(CreateVec3( 0.0f,   -0.3f, -1.0f),   0.2f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
-	spheres[5] = CreateSphere(CreateVec3( 0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
-	spheres[6] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
+	spheres[3] = CreateSphere(CreateVec3( 0.0f,   -0.3f, -1.0f),   0.2f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
+	spheres[4] = CreateSphere(CreateVec3( 0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
+	spheres[5] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
 
-	cl_int numTriangles = 1;
+
+	int numVertices = 0;
+	cl_int numTriangles = 0;
+	std::ifstream infile("cube.obj");
+	CLVec3 transform = CreateVec3(0.5f, -0.55f, -1.5f);
+	CLVec3 scale = CreateVec3(1.0f, 1.0f, 1.0f);
+
+	std::string line;
+	while (std::getline(infile, line))
+	{
+		std::istringstream iss(line);
+		std::string type;
+		iss >> type;
+		if (type == "v")
+		{
+			numVertices++;
+		}
+		else if (type == "f")
+		{
+			numTriangles++;
+		}
+	}
+
+	int currentVertex = 0;
+	int currentFace = 0;
+
+	CLVec3 *vertices = (CLVec3*)malloc(numVertices * sizeof(CLVec3));
 	CLTriangle *triangles = (CLTriangle*)malloc(numTriangles * sizeof(CLTriangle));
-	triangles[0] = CreateTriangle(
-		CreateVec3(-0.5f, -0.5f, -1.0f),
-		CreateVec3( 0.5f, -0.5f, -1.0f),
-		CreateVec3( 0.0f,  0.5f, -1.0f),
-		CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 0)
-	);
+
+	infile.clear();
+	infile.seekg(0, std::ios::beg);
+
+	while (std::getline(infile, line))
+	{
+		std::istringstream iss(line);
+		std::string type;
+		iss >> type;
+
+		if (type == "v")
+		{
+			float x, y, z;
+			iss >> x >> y >> z;
+			vertices[currentVertex] = CreateVec3(
+				x * scale.x + transform.x,
+				y * scale.y + transform.y,
+				z * scale.z + transform.z
+			);
+			currentVertex++;
+		}
+		else if (type == "f")
+		{
+			int a, b, c;
+
+			std::string faceLine = line.c_str();
+			int numSpaces = 0;
+			for (int i = 0; i < faceLine.length(); i++)
+			{
+				if (faceLine[i] == ' ')
+				{
+					if (faceLine[i+1] != ' ')
+					{
+						numSpaces++;
+						
+						if (numSpaces == 1)
+						{
+							a = (int)faceLine[i+1] - 48;
+						}
+						else if (numSpaces == 2)
+						{
+							b = (int)faceLine[i+1] - 48;
+							
+						}
+						else if (numSpaces == 3)
+						{
+							c = (int)faceLine[i+1] - 48;
+						}
+					}
+					
+				}
+			}
+			
+			triangles[currentFace] = CreateTriangle(
+				vertices[a - 1],
+				vertices[b - 1],
+				vertices[c - 1],
+				CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1)
+			);
+			currentFace++;
+		}
+	}
+
 
 	imageDataWidth[0] = IMAGE_WIDTH;
 	imageDataHeight[0] = IMAGE_HEIGHT;
