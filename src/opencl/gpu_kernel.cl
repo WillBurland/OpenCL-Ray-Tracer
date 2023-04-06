@@ -28,6 +28,12 @@ typedef struct
 
 typedef struct
 {
+	Vec3 p0, p1, p2;
+	Material material;
+} Triangle;
+
+typedef struct
+{
 	Vec3 p;
 	Vec3 normal;
 	double t;
@@ -60,10 +66,11 @@ float Vec3Dot(Vec3 a, Vec3 b);
 Vec3 Vec3Cross(Vec3 a, Vec3 b);
 Vec3 Vec3Unit(Vec3 a);
 Vec3 Vec3RandInUnitSphere(ulong *seed);
-Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, ulong *seed);
+Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, ulong *seed);
 void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal);
-bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount);
+bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount);
 bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit);
+bool HitTriangle(Triangle t, Ray r, double tMin, double tMax, HitRecord *hit);
 Ray GetRay(Camera camera, float u, float v);
 ulong NextSeed(ulong seed);
 float RandFloatFromSeed(ulong *seed);
@@ -202,7 +209,7 @@ Vec3 RayAt(Ray ray, float t)
 }
 
 
-Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, ulong *seed)
+Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, ulong *seed)
 {
 	Vec3 unitDirection = Vec3Unit(ray.direction);
 	float t = 0.5f * (unitDirection.y + 1.0f);
@@ -214,7 +221,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, ulong *s
 
 	while (currentDepth < maxDepth)
 	{
-		if (HitAnything(&hitRecord, ray, 0.001f, INFINITY, spheres, sphereCount))
+		if (HitAnything(&hitRecord, ray, 0.001f, INFINITY, spheres, sphereCount, triangles, triangleCount))
 		{
 			Ray scattered;
 			Vec3 attenuation;
@@ -290,7 +297,7 @@ void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal)
 	hitRecord->normal = hitRecord->frontFace ? outwardNormal : Vec3MulFloat(outwardNormal, -1);
 }
 
-bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount)
+bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount)
 {
 	HitRecord temp;
 	bool hitAnything = false;
@@ -299,6 +306,16 @@ bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *
 	for (int i = 0; i < sphereCount; i++)
 	{
 		if (HitSphere(spheres[i], ray, tMin, closestSoFar, &temp))
+		{
+			hitAnything = true;
+			closestSoFar = temp.t;
+			*hitRecord = temp;
+		}
+	}
+
+	for (int i = 0; i < triangleCount; i++)
+	{
+		if (HitTriangle(triangles[i], ray, tMin, closestSoFar, &temp))
 		{
 			hitAnything = true;
 			closestSoFar = temp.t;
@@ -362,7 +379,7 @@ bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *sc
 	return true;
 }
 
-// ===== SPHERE FUNCTIONS =====
+// ===== COLLISION FUNCTIONS =====
 
 bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit)
 {
@@ -398,6 +415,51 @@ bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit)
 	return true;
 }
 
+bool HitTriangle(Triangle t, Ray r, double tMin, double tMax, HitRecord *hit)
+{
+	Vec3 edge0 = Vec3SubVec3(t.p1, t.p0);
+	Vec3 edge1 = Vec3SubVec3(t.p2, t.p0);
+	Vec3 h = Vec3Cross(r.direction, edge1);
+	float a = Vec3Dot(edge0, h);
+
+	if (a > -0.00001f && a < 0.00001f)
+	{
+		return false;
+	}
+
+	float f = 1.0f / a;
+	Vec3 s = Vec3SubVec3(r.origin, t.p0);
+	float u = f * Vec3Dot(s, h);
+
+	if (u < 0.0f || u > 1.0f)
+	{
+		return false;
+	}
+
+	Vec3 q = Vec3Cross(s, edge0);
+	float v = f * Vec3Dot(r.direction, q);
+
+	if (v < 0.0f || u + v > 1.0f)
+	{
+		return false;
+	}
+
+	float t0 = f * Vec3Dot(edge1, q);
+
+	if (t0 > tMin && t0 < tMax)
+	{
+		hit->t = t0;
+		hit->p = RayAt(r, t0);
+		Vec3 outwardNormal = Vec3Unit(Vec3Cross(edge0, edge1));
+		SetFaceNormal(hit, r, outwardNormal);
+		hit->material = t.material;
+
+		return true;
+	}
+	
+	return false;
+}
+
 // ===== CAMERA FUNCTIONS =====
 
 Ray GetRay(Camera camera, float s, float t)
@@ -428,7 +490,7 @@ float DegToRad(float degrees)
 
 // ===== MAIN FUNCTION =====
 
-__kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds, __constant Camera *_camera, __global Sphere *_spheres, __constant int *_sphereCount)
+__kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds, __constant Camera *_camera, __global Sphere *_spheres, __constant int *_sphereCount, __global Triangle *_triangles, __constant int *_triangleCount)
 {
 	int global_id = get_global_id(0);
 
@@ -437,6 +499,8 @@ __kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds
 	Camera camera = *_camera;
 	Sphere *spheres = _spheres;
 	int sphereCount = *_sphereCount;
+	Triangle *triangles = _triangles;
+	int triangleCount = *_triangleCount;
 
 	Vec3 pixelColour = {0.0, 0.0, 0.0};
 
@@ -446,7 +510,7 @@ __kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds
 		float v = ((float)(global_id / camera.width) + RandFloatFromSeed(&seed)) / camera.height;
 
 		Ray ray = GetRay(camera, u, v);
-		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, camera.maxDepth, spheres, sphereCount, &seed));
+		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, camera.maxDepth, spheres, sphereCount, triangles, triangleCount, &seed));
 	}
 	
 	RGB[global_id] = Vec3DivFloat(pixelColour, camera.samplesPerPixel / 255.0f);

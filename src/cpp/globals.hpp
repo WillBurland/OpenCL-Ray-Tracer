@@ -10,7 +10,7 @@
 #define IMAGE_WIDTH 1600 // must be divisible by 64
 #define IMAGE_HEIGHT (int)(IMAGE_WIDTH / ASPECT_RATIO)
 #define BYTES_PER_PIXEL 3
-#define SAMPLES_PER_PIXEL 512
-#define MAX_DEPTH 32
+#define SAMPLES_PER_PIXEL 64
+#define MAX_DEPTH 16
 
 #endif

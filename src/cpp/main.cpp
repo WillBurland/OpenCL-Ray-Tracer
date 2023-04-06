@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include "bitmap_io.hpp"
+#include "cl_triangle.hpp"
 #include "cl_sphere.hpp"
 #include "cl_vec3.hpp"
 #include "colour.hpp"
@@ -97,6 +98,15 @@ int main()
 	spheres[5] = CreateSphere(CreateVec3( 0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
 	spheres[6] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
 
+	cl_int numTriangles = 1;
+	CLTriangle *triangles = (CLTriangle*)malloc(numTriangles * sizeof(CLTriangle));
+	triangles[0] = CreateTriangle(
+		CreateVec3(-0.5f, -0.5f, -1.0f),
+		CreateVec3( 0.5f, -0.5f, -1.0f),
+		CreateVec3( 0.0f,  0.5f, -1.0f),
+		CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 0)
+	);
+
 	imageDataWidth[0] = IMAGE_WIDTH;
 	imageDataHeight[0] = IMAGE_HEIGHT;
 	imageDataSamplesPerPixel[0] = SAMPLES_PER_PIXEL;
@@ -130,6 +140,8 @@ int main()
 	cl::Buffer bufferCamera(context, CL_MEM_READ_ONLY, sizeof(CLCamera));
 	cl::Buffer bufferSpheres(context, CL_MEM_READ_ONLY, numSpheres * sizeof(CLSphere));
 	cl::Buffer bufferNumSpheres(context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer bufferTriangles(context, CL_MEM_READ_ONLY, numTriangles * sizeof(CLTriangle));
+	cl::Buffer bufferNumTriangles(context, CL_MEM_READ_ONLY, sizeof(int));
 
 	cl::CommandQueue queue(context, defaultDevice);
 
@@ -139,6 +151,8 @@ int main()
 	queue.enqueueWriteBuffer(bufferCamera, CL_TRUE, 0, sizeof(CLCamera), camera);
 	queue.enqueueWriteBuffer(bufferSpheres, CL_TRUE, 0, numSpheres * sizeof(CLSphere), spheres);
 	queue.enqueueWriteBuffer(bufferNumSpheres, CL_TRUE, 0, sizeof(int), &numSpheres);
+	queue.enqueueWriteBuffer(bufferTriangles, CL_TRUE, 0, numTriangles * sizeof(CLTriangle), triangles);
+	queue.enqueueWriteBuffer(bufferNumTriangles, CL_TRUE, 0, sizeof(int), &numTriangles);
 
 	printf("Setting kernel arguments...\n");
 	cl::Kernel kernel(program, "pixel_colour");
@@ -159,6 +173,8 @@ int main()
 	kernel.setArg(2, bufferCamera);
 	kernel.setArg(3, bufferSpheres);
 	kernel.setArg(4, bufferNumSpheres);
+	kernel.setArg(5, bufferTriangles);
+	kernel.setArg(6, bufferNumTriangles);
 
 	std::chrono::steady_clock::time_point endKernel = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
@@ -184,6 +200,8 @@ int main()
 		sizeof(CLCamera) + // cameraBuffer
 		numSpheres * sizeof(CLSphere) + // spheresBuffer
 		sizeof(int) + // numSpheresBuffer
+		numTriangles * sizeof(CLTriangle) + // trianglesBuffer
+		sizeof(int) + // numTrianglesBuffer
 		kernelMemoryUsage * (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize // kernel memory usage
 	) / 1024);
 	
