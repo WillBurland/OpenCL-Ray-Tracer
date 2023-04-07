@@ -48,8 +48,6 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 ## To-do
 
 - Texture support
-- Emissive material support
-- Bounding box optimisation
 - Scene descriptor JSON file
 - Depth of field
 - Positionable sun

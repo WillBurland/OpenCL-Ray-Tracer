@@ -232,8 +232,11 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 {
 	Vec3 unitDirection = Vec3Unit(ray.direction);
 	float t = 0.5f * (unitDirection.y + 1.0f);
-	Vec3 skyColour = Vec3AddVec3(Vec3MulFloat((Vec3){ 1.0f, 1.0f, 1.0f }, 1.0f - t), Vec3MulFloat((Vec3){ 0.5f, 0.7f, 1.0f }, t));
-	Vec3 finalColour = skyColour;
+	
+	//Vec3 skyColour = Vec3AddVec3(Vec3MulFloat((Vec3){ 1.0f, 1.0f, 1.0f }, 1.0f - t), Vec3MulFloat((Vec3){ 0.5f, 0.7f, 1.0f }, t));
+	Vec3 skyColour = (Vec3){0.0f, 0.0f, 0.0f};
+
+	Vec3 directLightColour = (Vec3){ 1.0f, 1.0f, 1.0f };
 
 	int currentDepth = 0;
 	HitRecord hitRecord;
@@ -251,7 +254,8 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 					if (LambertianScatter(ray, &hitRecord, &attenuation, &scattered, seed))
 					{
 						ray = scattered;
-						finalColour = Vec3MulVec3(finalColour, attenuation);
+						skyColour = Vec3MulVec3(skyColour, attenuation);
+						directLightColour = Vec3MulVec3(directLightColour, attenuation);
 						currentDepth++;
 						continue;
 					}
@@ -265,7 +269,8 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 					if (MetalScatter(ray, &hitRecord, &attenuation, &scattered, seed))
 					{
 						ray = scattered;
-						finalColour = Vec3MulVec3(finalColour, attenuation);
+						skyColour = Vec3MulVec3(skyColour, attenuation);
+						directLightColour = Vec3MulVec3(directLightColour, attenuation);
 						currentDepth++;
 						continue;
 					}
@@ -279,7 +284,8 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 					if (DielectricScatter(ray, &hitRecord, &attenuation, &scattered, seed))
 					{
 						ray = scattered;
-						finalColour = Vec3MulVec3(finalColour, attenuation);
+						skyColour = Vec3MulVec3(skyColour, attenuation);
+						directLightColour = Vec3MulVec3(directLightColour, attenuation);
 						currentDepth++;
 						continue;
 					}
@@ -287,6 +293,10 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 					{
 						return (Vec3){ 0, 0, 0 };
 					}
+				} break;
+				case 3:
+				{
+					return directLightColour;
 				}
 			}
 			currentDepth++;
@@ -299,13 +309,8 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 	{
 		return (Vec3){ 0, 0, 0 };
 	}
-	
-	if (currentDepth == 0)
-	{
-		return skyColour;
-	}
 
-	return finalColour;
+	return skyColour;
 }
 
 // ===== HIT RECORD FUNCTIONS =====

@@ -100,7 +100,7 @@ int main()
 	spheres[2] = CreateSphere(CreateVec3(-0.9f,    0.0f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.1f, 0.0f, 1));
 	spheres[3] = CreateSphere(CreateVec3( 0.0f,   -0.3f, -1.0f),   0.2f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
 	spheres[4] = CreateSphere(CreateVec3( 0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
-	spheres[5] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
+	spheres[5] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(1.0f, 1.0f, 1.0f), 0.0f, 0.0f, 3));
 
 
 	printf("Generating triangles from mesh...\n");
