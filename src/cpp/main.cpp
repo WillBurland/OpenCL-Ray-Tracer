@@ -103,6 +103,7 @@ int main()
 	spheres[5] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
 
 
+	printf("Generating triangles from mesh...\n");
 	int numVertices = 0;
 	cl_int numTriangles = 0;
 	std::ifstream infile("burger.obj");

@@ -8,10 +8,12 @@
 typedef struct
 {
 	CLVec3 center;
-	cl_double radius;
+	cl_float radius;
 	CLMaterial material;
+	CLVec3 boundingBoxMin;
+	CLVec3 boundingBoxMax;
 } CLSphere;
 
-CLSphere CreateSphere(CLVec3 center, cl_double radius, CLMaterial material);
+CLSphere CreateSphere(CLVec3 center, cl_float radius, CLMaterial material);
 
 #endif

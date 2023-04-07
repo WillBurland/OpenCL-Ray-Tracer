@@ -9,6 +9,8 @@ typedef struct
 {
 	CLVec3 p0, p1, p2;
 	CLMaterial material;
+	CLVec3 boundingBoxMin;
+	CLVec3 boundingBoxMax;
 } CLTriangle;
 
 CLTriangle CreateTriangle(CLVec3 p0, CLVec3 p1, CLVec3 p2, CLMaterial material);

@@ -9,6 +9,7 @@ typedef struct
 {
 	Vec3 origin;
 	Vec3 direction;
+	Vec3 invDirection;
 } Ray;
 
 typedef struct
@@ -22,21 +23,25 @@ typedef struct
 typedef struct
 {
 	Vec3 center;
-	double radius;
+	float radius;
 	Material material;
+	Vec3 boundingBoxMin;
+	Vec3 boundingBoxMax;
 } Sphere;
 
 typedef struct
 {
 	Vec3 p0, p1, p2;
 	Material material;
+	Vec3 boundingBoxMin;
+	Vec3 boundingBoxMax;
 } Triangle;
 
 typedef struct
 {
 	Vec3 p;
 	Vec3 normal;
-	double t;
+	float t;
 	bool frontFace;
 	Material material;
 } HitRecord;
@@ -66,17 +71,26 @@ float Vec3Dot(Vec3 a, Vec3 b);
 Vec3 Vec3Cross(Vec3 a, Vec3 b);
 Vec3 Vec3Unit(Vec3 a);
 Vec3 Vec3RandInUnitSphere(ulong *seed);
+Vec3 Vec3RandUnitVector(ulong *seed);
+bool Vec3NearZero(Vec3 a);
+Vec3 Vec3Reflect(Vec3 v, Vec3 n);
+Vec3 Vec3Refract(Vec3 uv, Vec3 n, float etaiOverEtat);
+float Vec3Reflectance(float cosine, float refIdx);
+Vec3 Vec3Inv(Vec3 a);
+Vec3 RayAt(Ray ray, float t);
 Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, ulong *seed);
 void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal);
 bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount);
-bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit);
-bool HitTriangle(Triangle t, Ray r, double tMin, double tMax, HitRecord *hit);
-Ray GetRay(Camera camera, float u, float v);
-ulong NextSeed(ulong seed);
-float RandFloatFromSeed(ulong *seed);
 bool LambertianScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
+bool HitSphere(Sphere s, Ray r, float tMin, float tMax, HitRecord *hit);
+bool HitTriangle(Triangle t, Ray r, float tMin, float tMax, HitRecord *hit);
+bool HitBoundingBox(Vec3 min, Vec3 max, Ray r);
+Ray GetRay(Camera camera, float s, float t);
+ulong NextSeed(ulong seed);
+float RandFloatFromSeed(ulong *seed);
+float DegToRad(float degrees);
 
 // ===== VECTOR FUNCTIONS =====
 
@@ -194,11 +208,16 @@ Vec3 Vec3Refract(Vec3 uv, Vec3 n, float etaiOverEtat)
 	return Vec3AddVec3(rOutPerp, rOutParallel);
 }
 
-double Vec3Reflectance(double cosine, double refIdx)
+float Vec3Reflectance(float cosine, float refIdx)
 {
-	double r0 = (1 - refIdx) / (1 + refIdx);
+	float r0 = (1 - refIdx) / (1 + refIdx);
 	r0 = r0 * r0;
 	return r0 + (1 - r0) * pow((1 - cosine), 5);
+}
+
+Vec3 Vec3Inv(Vec3 a)
+{
+	return (Vec3){ 1.0f / a.x, 1.0f / a.y, 1.0f / a.z };
 }
 
 // ===== RAY FUNCTIONS =====
@@ -338,6 +357,7 @@ bool LambertianScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *sc
 
 	scattered->origin = hitRecord->p;
 	scattered->direction = scatterDir;
+	scattered->invDirection = Vec3Inv(scattered->direction);
 	*attenuation = hitRecord->material.albedo;
 
 	return true;
@@ -348,6 +368,7 @@ bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scatter
 	Vec3 reflected = Vec3Reflect(Vec3Unit(ray.direction), hitRecord->normal);
 	scattered->origin = hitRecord->p;
 	scattered->direction = Vec3AddVec3(reflected, Vec3MulFloat(Vec3RandInUnitSphere(seed), hitRecord->material.fuzz));
+	scattered->invDirection = Vec3Inv(scattered->direction);
 	*attenuation = hitRecord->material.albedo;
 	return Vec3Dot(scattered->direction, hitRecord->normal) > 0;
 }
@@ -375,13 +396,14 @@ bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *sc
 
 	scattered->origin = hitRecord->p;
 	scattered->direction = direction;
+	scattered->invDirection = Vec3Inv(scattered->direction);
 
 	return true;
 }
 
 // ===== COLLISION FUNCTIONS =====
 
-bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit)
+bool HitSphere(Sphere s, Ray r, float tMin, float tMax, HitRecord *hit)
 {
 	Vec3 oc = Vec3SubVec3(r.origin, s.center);
 	float a = Vec3LengthSquared(r.direction);
@@ -415,8 +437,13 @@ bool HitSphere(Sphere s, Ray r, double tMin, double tMax, HitRecord *hit)
 	return true;
 }
 
-bool HitTriangle(Triangle t, Ray r, double tMin, double tMax, HitRecord *hit)
+bool HitTriangle(Triangle t, Ray r, float tMin, float tMax, HitRecord *hit)
 {
+	if (!HitBoundingBox(t.boundingBoxMin, t.boundingBoxMax, r))
+	{
+		return false;
+	}
+
 	Vec3 edge0 = Vec3SubVec3(t.p1, t.p0);
 	Vec3 edge1 = Vec3SubVec3(t.p2, t.p0);
 	Vec3 h = Vec3Cross(r.direction, edge1);
@@ -460,6 +487,30 @@ bool HitTriangle(Triangle t, Ray r, double tMin, double tMax, HitRecord *hit)
 	return false;
 }
 
+bool HitBoundingBox(Vec3 min, Vec3 max, Ray r)
+{
+	float tx1 = (min.x - r.origin.x) * r.invDirection.x;
+	float tx2 = (max.x - r.origin.x) * r.invDirection.x;
+
+	float tmin = fmin(tx1, tx2);
+	float tmax = fmax(tx1, tx2);
+
+	float ty1 = (min.y - r.origin.y) * r.invDirection.y;
+	float ty2 = (max.y - r.origin.y) * r.invDirection.y;
+
+	tmin = fmax(tmin, fmin(ty1, ty2));
+	tmax = fmin(tmax, fmax(ty1, ty2));
+
+	float tz1 = (min.z - r.origin.z) * r.invDirection.z;
+	float tz2 = (max.z - r.origin.z) * r.invDirection.z;
+
+	tmin = fmax(tmin, fmin(tz1, tz2));
+	tmax = fmin(tmax, fmax(tz1, tz2));
+
+	return tmax > fmax(tmin, 0.0f);
+}
+
+
 // ===== CAMERA FUNCTIONS =====
 
 Ray GetRay(Camera camera, float s, float t)
@@ -467,6 +518,7 @@ Ray GetRay(Camera camera, float s, float t)
 	Ray result;
 	result.origin = camera.origin;
 	result.direction = Vec3SubVec3(Vec3AddVec3(Vec3AddVec3(camera.lowerLeftCorner, Vec3MulFloat(camera.horizontal, s)), Vec3MulFloat(camera.vertical, t)), camera.origin);
+	result.invDirection = Vec3Inv(result.direction);
 	return result;
 }
 
