@@ -82,7 +82,7 @@ int main()
 	CLCamera *camera = (CLCamera*)malloc(sizeof(CLCamera));
 	CalculateCamera(
 		camera,
-		CLVec3{ -2.5f, 1.5f,  3.5f },
+		CLVec3{ -3.5f, 0.2f,  1.5f },
 		CLVec3{  0.2f, 0.0f, -1.5f },
 		CLVec3{  0.0f, 1.0f,  0.0f },
 		20.0f,
@@ -97,19 +97,19 @@ int main()
 	cl_int numSpheres = 6;
 	CLSphere *spheres = (CLSphere*)malloc(numSpheres * sizeof(CLSphere));
 	spheres[0] = CreateSphere(CreateVec3( 0.0f, -100.5f, -1.0f), 100.0f, CreateMaterial(CreateVec3(0.0f, 0.8f, 0.7f), 0.0f, 0.0f, 0));
-	spheres[1] = CreateSphere(CreateVec3( 0.0f,    0.5f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.7f, 0.3f, 0.9f), 0.0f, 0.0f, 0));
-	spheres[2] = CreateSphere(CreateVec3(-0.9f,    0.0f, -1.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.1f, 0.0f, 1));
-	spheres[3] = CreateSphere(CreateVec3( 0.0f,   -0.3f, -1.0f),   0.2f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
-	spheres[4] = CreateSphere(CreateVec3( 0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
-	spheres[5] = CreateSphere(CreateVec3(-0.2f,   -0.4f, -0.8f),   0.1f, CreateMaterial(CreateVec3(1.0f, 1.0f, 1.0f), 0.0f, 0.0f, 3));
+	spheres[1] = CreateSphere(CreateVec3( 1.6f,    0.0f, -1.3f),   0.5f, CreateMaterial(CreateVec3(0.7f, 0.3f, 0.9f), 0.0f, 0.0f, 0));
+	spheres[2] = CreateSphere(CreateVec3(-0.5f,    0.0f, -2.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.2f, 0.0f, 1));
+	spheres[3] = CreateSphere(CreateVec3( 0.5f,   -0.2f, -1.8f),   0.3f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
+	spheres[4] = CreateSphere(CreateVec3( 0.2f,  -0.35f, -0.4f),  0.15f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
+	spheres[5] = CreateSphere(CreateVec3(-0.8f,   -0.4f, -1.6f),   0.1f, CreateMaterial(CreateVec3(1.0f, 1.0f, 1.0f), 0.0f, 0.0f, 3));
 
 
 	printf("Generating triangles from mesh...\n");
 	int numVertices = 0;
 	cl_int numTriangles = 0;
-	std::ifstream infile("burger.obj");
-	CLVec3 transform = CreateVec3(1.0f, -0.5f, -1.0f);
-	CLVec3 scale = CreateVec3(0.1f, 0.1f, 0.1f);
+	std::ifstream infile("f1_car.obj");
+	CLVec3 transform = CreateVec3(0.0f, -0.5f, -1.0f);
+	CLVec3 scale = CreateVec3(0.15f, 0.15f, 0.15f);
 
 	std::string line;
 	while (std::getline(infile, line))
@@ -341,7 +341,6 @@ int main()
 	queue.finish();
 
 	printf("Writing to file...\n");
-	int rowsDone = 0;
 	for (int i = 0; i < IMAGE_HEIGHT; i++)
 	{
 		for (int j = 0; j < IMAGE_WIDTH; j++)
@@ -352,8 +351,6 @@ int main()
 				imageData[i * IMAGE_WIDTH + j].z);
 			WriteColour(i, j, IMAGE_WIDTH, IMAGE_HEIGHT, pixelColour);
 		}
-		
-		rowsDone++;
 	}
 
 	generateBitmapImage((unsigned char*)image, IMAGE_HEIGHT, IMAGE_WIDTH, imageFileName);
