@@ -8,9 +8,10 @@ Build on top of [Ray-Tracer-Legacy](https://github.com/Will1162/Ray-Tracer-Legac
 
 The inspiration and general implementation techniques came from Peter Shirley's [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html). As development platforms varied, I had to find ways to adapt Peter's code to work with my own codebase, especially as OpenCL does not yet support C++ features such as classes, as it is based on C99.
 
+
 ## Sample image from a recent commit
 
-![output](https://user-images.githubusercontent.com/39223201/230485152-3de165af-2439-4949-b5ce-de8ad004f0a6.png)
+![output](https://github.com/Will1162/OpenCL-Ray-Tracer/assets/39223201/cfc49fe3-eed1-4f9a-868e-c5de7966fb5d)
 
 ## Comparison to Legacy-Ray-Tracer
 
