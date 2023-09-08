@@ -6,12 +6,13 @@
 #include <string>
 
 #include "bitmap_io.hpp"
-#include "cl_triangle.hpp"
-#include "cl_sphere.hpp"
-#include "cl_vec3.hpp"
 #include "colour.hpp"
 #include "globals.hpp"
 #include "vec3.hpp"
+#include "opencl_objects/cl_bounding_box.hpp"
+#include "opencl_objects/cl_triangle.hpp"
+#include "opencl_objects/cl_sphere.hpp"
+#include "opencl_objects/cl_vec3.hpp"
 
 unsigned char image[IMAGE_WIDTH][IMAGE_HEIGHT][BYTES_PER_PIXEL];
 
@@ -131,6 +132,11 @@ int main()
 
 	CLVec3 *vertices = (CLVec3*)malloc(numVertices * sizeof(CLVec3));
 	CLTriangle *triangles = (CLTriangle*)malloc(numTriangles * sizeof(CLTriangle));
+	int numBoundingBoxes = 1;
+	CLBoundingBox *boundingBoxes = (CLBoundingBox*)malloc(numBoundingBoxes * sizeof(CLBoundingBox));
+
+	CLVec3 min = CreateVec3(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+	CLVec3 max = CreateVec3(std::numeric_limits<float>::min(), std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
 
 	infile.clear();
 	infile.seekg(0, std::ios::beg);
@@ -150,6 +156,21 @@ int main()
 				y * scale.y + transform.y,
 				z * scale.z + transform.z
 			);
+
+			if (vertices[currentVertex].x < min.x)
+				min.x = vertices[currentVertex].x;
+			if (vertices[currentVertex].y < min.y)
+				min.y = vertices[currentVertex].y;
+			if (vertices[currentVertex].z < min.z)
+				min.z = vertices[currentVertex].z;
+			
+			if (vertices[currentVertex].x > max.x)
+				max.x = vertices[currentVertex].x;
+			if (vertices[currentVertex].y > max.y)	
+				max.y = vertices[currentVertex].y;
+			if (vertices[currentVertex].z > max.z)
+				max.z = vertices[currentVertex].z;
+
 			currentVertex++;
 		}
 		else if (type == "f")
@@ -184,7 +205,8 @@ int main()
 				vertices[a - 1],
 				vertices[b - 1],
 				vertices[c - 1],
-				CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1)
+				CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1),
+				0
 			);
 
 			currentFace++;
@@ -192,6 +214,8 @@ int main()
 	}
 
 	infile.close();
+
+	boundingBoxes[0] = (CLBoundingBox){0, min, max};
 
 
 	imageDataWidth[0] = IMAGE_WIDTH;
@@ -229,6 +253,8 @@ int main()
 	cl::Buffer bufferNumSpheres(context, CL_MEM_READ_ONLY, sizeof(int));
 	cl::Buffer bufferTriangles(context, CL_MEM_READ_ONLY, numTriangles * sizeof(CLTriangle));
 	cl::Buffer bufferNumTriangles(context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer bufferBoundingBoxes(context, CL_MEM_READ_ONLY, numBoundingBoxes * sizeof(CLBoundingBox));
+	cl::Buffer bufferNumBoundingBoxes(context, CL_MEM_READ_ONLY, sizeof(int));
 
 	cl::CommandQueue queue(context, defaultDevice);
 
@@ -240,6 +266,8 @@ int main()
 	queue.enqueueWriteBuffer(bufferNumSpheres, CL_TRUE, 0, sizeof(int), &numSpheres);
 	queue.enqueueWriteBuffer(bufferTriangles, CL_TRUE, 0, numTriangles * sizeof(CLTriangle), triangles);
 	queue.enqueueWriteBuffer(bufferNumTriangles, CL_TRUE, 0, sizeof(int), &numTriangles);
+	queue.enqueueWriteBuffer(bufferBoundingBoxes, CL_TRUE, 0, numBoundingBoxes * sizeof(CLBoundingBox), boundingBoxes);
+	queue.enqueueWriteBuffer(bufferNumBoundingBoxes, CL_TRUE, 0, sizeof(int), &numBoundingBoxes);
 
 	printf("Setting kernel arguments...\n");
 	cl::Kernel kernel(program, "pixel_colour");
@@ -262,6 +290,8 @@ int main()
 	kernel.setArg(4, bufferNumSpheres);
 	kernel.setArg(5, bufferTriangles);
 	kernel.setArg(6, bufferNumTriangles);
+	kernel.setArg(7, bufferBoundingBoxes);
+	kernel.setArg(8, bufferNumBoundingBoxes);
 
 	std::chrono::steady_clock::time_point endKernel = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
@@ -289,6 +319,8 @@ int main()
 		sizeof(int) + // numSpheresBuffer
 		numTriangles * sizeof(CLTriangle) + // trianglesBuffer
 		sizeof(int) + // numTrianglesBuffer
+		numBoundingBoxes * sizeof(CLBoundingBox) + // boundingBoxesBuffer
+		sizeof(int) + // numBoundingBoxesBuffer
 		kernelMemoryUsage * (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize // kernel memory usage
 	) / 1024);
 	

@@ -33,9 +33,15 @@ typedef struct
 {
 	Vec3 p0, p1, p2;
 	Material material;
-	Vec3 boundingBoxMin;
-	Vec3 boundingBoxMax;
+	int boundingBoxId;
 } Triangle;
+
+typedef struct
+{
+	int id;
+	Vec3 min;
+	Vec3 max;
+} BoundingBox;
 
 typedef struct
 {
@@ -78,9 +84,9 @@ Vec3 Vec3Refract(Vec3 uv, Vec3 n, float etaiOverEtat);
 float Vec3Reflectance(float cosine, float refIdx);
 Vec3 Vec3Inv(Vec3 a);
 Vec3 RayAt(Ray ray, float t);
-Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, ulong *seed);
+Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount, ulong *seed);
 void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal);
-bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount);
+bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount);
 bool LambertianScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
@@ -227,14 +233,15 @@ Vec3 RayAt(Ray ray, float t)
 	return Vec3AddVec3(ray.origin, Vec3MulFloat(ray.direction, t));
 }
 
-
-Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, ulong *seed)
+Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount, ulong *seed)
 {
 	Vec3 unitDirection = Vec3Unit(ray.direction);
 	float t = 0.5f * (unitDirection.y + 1.0f);
 	
-	//Vec3 skyColour = Vec3AddVec3(Vec3MulFloat((Vec3){ 1.0f, 1.0f, 1.0f }, 1.0f - t), Vec3MulFloat((Vec3){ 0.5f, 0.7f, 1.0f }, t));
+	bool useSun = true;
 	Vec3 skyColour = (Vec3){0.0f, 0.0f, 0.0f};
+	if (useSun)
+		skyColour = Vec3AddVec3(Vec3MulFloat((Vec3){ 1.0f, 1.0f, 1.0f }, 1.0f - t), Vec3MulFloat((Vec3){ 0.5f, 0.7f, 1.0f }, t));
 
 	Vec3 directLightColour = (Vec3){ 1.0f, 1.0f, 1.0f };
 
@@ -243,7 +250,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 
 	while (currentDepth < maxDepth)
 	{
-		if (HitAnything(&hitRecord, ray, 0.001f, INFINITY, spheres, sphereCount, triangles, triangleCount))
+		if (HitAnything(&hitRecord, ray, 0.001f, INFINITY, spheres, sphereCount, triangles, triangleCount, boundingBoxes, boundingBoxCount))
 		{
 			Ray scattered;
 			Vec3 attenuation;
@@ -321,7 +328,7 @@ void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal)
 	hitRecord->normal = hitRecord->frontFace ? outwardNormal : Vec3MulFloat(outwardNormal, -1);
 }
 
-bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount)
+bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount)
 {
 	HitRecord temp;
 	bool hitAnything = false;
@@ -337,13 +344,22 @@ bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *
 		}
 	}
 
-	for (int i = 0; i < triangleCount; i++)
+	for (int i = 0; i < boundingBoxCount; i++)
 	{
-		if (HitTriangle(triangles[i], ray, tMin, closestSoFar, &temp))
+		if (HitBoundingBox(boundingBoxes[i].min, boundingBoxes[i].max, ray))
 		{
-			hitAnything = true;
-			closestSoFar = temp.t;
-			*hitRecord = temp;
+			for (int j = 0; j < triangleCount; j++)
+			{
+				if (triangles[j].boundingBoxId == i)
+				{
+					if (HitTriangle(triangles[j], ray, tMin, closestSoFar, &temp))
+					{
+						hitAnything = true;
+						closestSoFar = temp.t;
+						*hitRecord = temp;
+					}
+				}
+			}
 		}
 	}
 
@@ -444,11 +460,6 @@ bool HitSphere(Sphere s, Ray r, float tMin, float tMax, HitRecord *hit)
 
 bool HitTriangle(Triangle t, Ray r, float tMin, float tMax, HitRecord *hit)
 {
-	if (!HitBoundingBox(t.boundingBoxMin, t.boundingBoxMax, r))
-	{
-		return false;
-	}
-
 	Vec3 edge0 = Vec3SubVec3(t.p1, t.p0);
 	Vec3 edge1 = Vec3SubVec3(t.p2, t.p0);
 	Vec3 h = Vec3Cross(r.direction, edge1);
@@ -515,7 +526,6 @@ bool HitBoundingBox(Vec3 min, Vec3 max, Ray r)
 	return tmax > fmax(tmin, 0.0f);
 }
 
-
 // ===== CAMERA FUNCTIONS =====
 
 Ray GetRay(Camera camera, float s, float t)
@@ -547,7 +557,13 @@ float DegToRad(float degrees)
 
 // ===== MAIN FUNCTION =====
 
-__kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds, __constant Camera *_camera, __global Sphere *_spheres, __constant int *_sphereCount, __global Triangle *_triangles, __constant int *_triangleCount)
+__kernel void pixel_colour(
+	__global Vec3 *RGB,
+	__global unsigned int *_randSeeds,
+	__constant Camera *_camera,
+	__global Sphere      *_spheres,       __constant int *_sphereCount,
+	__global Triangle    *_triangles,     __constant int *_triangleCount,
+	__global BoundingBox *_boundingBoxes, __constant int *_boundingBoxCount)
 {
 	int global_id = get_global_id(0);
 
@@ -558,6 +574,8 @@ __kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds
 	int sphereCount = *_sphereCount;
 	Triangle *triangles = _triangles;
 	int triangleCount = *_triangleCount;
+	BoundingBox *boundingBoxes = _boundingBoxes;
+	int boundingBoxCount = *_boundingBoxCount;
 
 	Vec3 pixelColour = {0.0, 0.0, 0.0};
 
@@ -567,7 +585,7 @@ __kernel void pixel_colour(__global Vec3 *RGB, __global unsigned int *_randSeeds
 		float v = ((float)(global_id / camera.width) + RandFloatFromSeed(&seed)) / camera.height;
 
 		Ray ray = GetRay(camera, u, v);
-		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, camera.maxDepth, spheres, sphereCount, triangles, triangleCount, &seed));
+		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, camera.maxDepth, spheres, sphereCount, triangles, triangleCount, boundingBoxes, boundingBoxCount, &seed));
 	}
 	
 	RGB[global_id] = Vec3DivFloat(pixelColour, camera.samplesPerPixel / 255.0f);

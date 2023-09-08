@@ -1,7 +1,7 @@
 #ifndef WB_RT_CL_VEC3_HPP
 #define WB_RT_CL_VEC3_HPP
 
-#include "globals.hpp"
+#include "../globals.hpp"
 
 #include <CL/opencl.hpp>
 

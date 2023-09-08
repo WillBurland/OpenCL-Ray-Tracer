@@ -13,12 +13,13 @@ echo Building...
 g++ -std=c++17 -O2 ^
 ../src/cpp/main.cpp ^
 ../src/cpp/bitmap_io.cpp ^
-../src/cpp/cl_material.cpp ^
-../src/cpp/cl_sphere.cpp ^
-../src/cpp/cl_triangle.cpp ^
-../src/cpp/cl_vec3.cpp ^
 ../src/cpp/colour.cpp ^
 ../src/cpp/vec3.cpp ^
+../src/cpp/opencl_objects/cl_bounding_box.cpp ^
+../src/cpp/opencl_objects/cl_material.cpp ^
+../src/cpp/opencl_objects/cl_sphere.cpp ^
+../src/cpp/opencl_objects/cl_triangle.cpp ^
+../src/cpp/opencl_objects/cl_vec3.cpp ^
 -I"C:\OpenCL\include" ^
 -L"C:\OpenCL\lib" ^
 -lOpenCL ^

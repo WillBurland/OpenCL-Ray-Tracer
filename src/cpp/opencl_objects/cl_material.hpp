@@ -2,7 +2,7 @@
 #define WB_RT_CL_MATERIAL_HPP
 
 #include "cl_vec3.hpp"
-#include "globals.hpp"
+#include "../globals.hpp"
 
 typedef struct
 {
