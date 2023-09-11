@@ -11,7 +11,7 @@ The inspiration and general implementation techniques came from Peter Shirley's 
 
 ## Sample image from a recent commit
 
-![output](https://github.com/Will1162/OpenCL-Ray-Tracer/assets/39223201/cfc49fe3-eed1-4f9a-868e-c5de7966fb5d)
+![output](https://github.com/Will1162/OpenCL-Ray-Tracer/assets/39223201/d495b93f-8e34-4c5c-bbcb-17a118aefc4b)
 
 ## Comparison to Legacy-Ray-Tracer
 
