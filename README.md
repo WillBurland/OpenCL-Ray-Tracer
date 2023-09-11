@@ -4,9 +4,9 @@
 	
 ## About the project
 
-Build on top of [Ray-Tracer-Legacy](https://github.com/Will1162/Ray-Tracer-Legacy), which ran on the CPU, as a single thread. This was slow, so I decided to convert the entire codebase into an OpenCL project, so that it would run in parellel. The conversion process took some time, as I needed to learn the quirks of programming with OpenCL and GPUs in general, but this repository continues from where the legacy project was last commited to.
+Build on top of [Ray-Tracer-Legacy](https://github.com/Will1162/Ray-Tracer-Legacy), which ran on the CPU, as a single thread. This was slow, so I decided to convert the entire codebase into an OpenCL project, so that it would run in parallel. The conversion process took some time, as I needed to learn the quirks of programming with OpenCL and GPUs in general, but this repository continues from where the legacy project was last committed to and has been improved upon greatly since then.
 
-The inspiration and general implementation techniques came from Peter Shirley's [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html). As development platforms varied, I had to find ways to adapt Peter's code to work with my own codebase, especially as OpenCL does not yet support C++ features such as classes, as it is based on C99.
+The initial inspiration and general implementation techniques came from Peter Shirley's [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html). As development platforms varied, the book using C++ a CPU workflow, and myself using OpenCL and a GPU workflow, I had to find ways to adapt Peter's code to work with my own codebase, especially as OpenCL does not yet support C++ features such as classes, as it is based on C99 and has many random quirks that can make it confusing to work with.
 
 
 ## Sample image from a recent commit
@@ -14,6 +14,9 @@ The inspiration and general implementation techniques came from Peter Shirley's 
 ![output](https://github.com/Will1162/OpenCL-Ray-Tracer/assets/39223201/d495b93f-8e34-4c5c-bbcb-17a118aefc4b)
 
 ## Comparison to Legacy-Ray-Tracer
+
+Note: The following comparison may be out of date and performance may have changed as the project has been updated since this comparison was made, with both new features and performance improvements.
+An equal test between the two now would not be a good comparison with how much the project has changed since then and was only possible initially as the two codebases were very similar.
 
 ### Output variables
 
@@ -23,7 +26,7 @@ The inspiration and general implementation techniques came from Peter Shirley's 
 | Samples per pixel | 250        |
 | Max bounce depth  | 50         |
 
-### Scene enviroment
+### Scene environment
 
 | Sphere # | X, Y, Z           | Radius | R, G, B       | Material   | Fuzz |
 |----------|-------------------|--------|---------------|------------|------|
@@ -40,7 +43,7 @@ The inspiration and general implementation techniques came from Peter Shirley's 
 | CPU (Legacy) | ~122s  |
 | GPU (OpenCL) | ~0.38s |
 
-This equates to an approximate speed up of 320x for my hardware between the two variations of the program
+This equates to an approximate speed up of 320x for my hardware between the two variations of the program, although realistically, the test is not a fair comparison as the CPU version was single threaded, as by the time I was thinking about moving to a multi-threaded CPU version, I had already started the conversion to OpenCL, so I decided to continue with that instead.
 
 ### Output image
 
@@ -51,7 +54,6 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 - Texture support
 - Scene descriptor JSON file
 - Depth of field
-- Positionable sun
 - Specular reflection
 - Code cleanup and commenting
 
