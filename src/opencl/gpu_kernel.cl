@@ -84,7 +84,7 @@ Vec3 Vec3Refract(Vec3 uv, Vec3 n, float etaiOverEtat);
 float Vec3Reflectance(float cosine, float refIdx);
 Vec3 Vec3Inv(Vec3 a);
 Vec3 RayAt(Ray ray, float t);
-Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount, ulong *seed);
+Vec3 RayColour(Ray ray, int maxDepth, Vec3 *hdrImage, int hdrImageWidth, int hdrImageHeight, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount, ulong *seed);
 void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal);
 bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount);
 bool LambertianScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
@@ -97,6 +97,7 @@ Ray GetRay(Camera camera, float s, float t);
 ulong NextSeed(ulong seed);
 float RandFloatFromSeed(ulong *seed);
 float DegToRad(float degrees);
+float* Vec3ToUV(Vec3 v);
 
 // ===== VECTOR FUNCTIONS =====
 
@@ -226,6 +227,16 @@ Vec3 Vec3Inv(Vec3 a)
 	return (Vec3){ 1.0f / a.x, 1.0f / a.y, 1.0f / a.z };
 }
 
+float* Vec3ToUV(Vec3 n)
+{
+	float uv[2];
+	n = Vec3Unit(n);
+	uv[0] = 0.5f + atan2(n.z, n.x) / (2.0f * (float)M_PI);
+	uv[1] = 0.5f - asin(n.y) / (float)M_PI;
+	return uv;
+	
+}
+
 // ===== RAY FUNCTIONS =====
 
 Vec3 RayAt(Ray ray, float t)
@@ -233,17 +244,12 @@ Vec3 RayAt(Ray ray, float t)
 	return Vec3AddVec3(ray.origin, Vec3MulFloat(ray.direction, t));
 }
 
-Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount, ulong *seed)
+Vec3 RayColour(Ray ray, int maxDepth, Vec3 *hdrImage, int hdrImageWidth, int hdrImageHeight, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount, ulong *seed)
 {
 	Vec3 unitDirection = Vec3Unit(ray.direction);
 	float t = 0.5f * (unitDirection.y + 1.0f);
-	
-	bool useSun = true;
-	Vec3 skyColour = (Vec3){0.0f, 0.0f, 0.0f};
-	if (useSun)
-		skyColour = Vec3AddVec3(Vec3MulFloat((Vec3){ 1.0f, 1.0f, 1.0f }, 1.0f - t), Vec3MulFloat((Vec3){ 0.5f, 0.7f, 1.0f }, t));
 
-	Vec3 directLightColour = (Vec3){ 1.0f, 1.0f, 1.0f };
+	Vec3 rayColour = (Vec3){ 1.0f, 1.0f, 1.0f };
 
 	int currentDepth = 0;
 	HitRecord hitRecord;
@@ -261,8 +267,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 					if (LambertianScatter(ray, &hitRecord, &attenuation, &scattered, seed))
 					{
 						ray = scattered;
-						skyColour = Vec3MulVec3(skyColour, attenuation);
-						directLightColour = Vec3MulVec3(directLightColour, attenuation);
+						rayColour = Vec3MulVec3(rayColour, attenuation);
 						currentDepth++;
 						continue;
 					}
@@ -276,8 +281,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 					if (MetalScatter(ray, &hitRecord, &attenuation, &scattered, seed))
 					{
 						ray = scattered;
-						skyColour = Vec3MulVec3(skyColour, attenuation);
-						directLightColour = Vec3MulVec3(directLightColour, attenuation);
+						rayColour = Vec3MulVec3(rayColour, attenuation);
 						currentDepth++;
 						continue;
 					}
@@ -291,8 +295,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 					if (DielectricScatter(ray, &hitRecord, &attenuation, &scattered, seed))
 					{
 						ray = scattered;
-						skyColour = Vec3MulVec3(skyColour, attenuation);
-						directLightColour = Vec3MulVec3(directLightColour, attenuation);
+						rayColour = Vec3MulVec3(rayColour, attenuation);
 						currentDepth++;
 						continue;
 					}
@@ -303,7 +306,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 				} break;
 				case 3:
 				{
-					return directLightColour;
+					return rayColour;
 				}
 			}
 			currentDepth++;
@@ -317,7 +320,12 @@ Vec3 RayColour(Ray ray, int maxDepth, Sphere *spheres, int sphereCount, Triangle
 		return (Vec3){ 0, 0, 0 };
 	}
 
-	return skyColour;
+	float* uv = Vec3ToUV(ray.direction);
+	int x = (int)(uv[0] * hdrImageWidth);
+	int y = (int)(uv[1] * hdrImageHeight);
+	Vec3 hdriColour = hdrImage[y * hdrImageWidth + x];
+
+	return Vec3MulVec3(rayColour, hdriColour);
 }
 
 // ===== HIT RECORD FUNCTIONS =====
@@ -559,6 +567,7 @@ float DegToRad(float degrees)
 
 __kernel void pixel_colour(
 	__global Vec3 *RGB,
+	__global Vec3 *_hdrImage, __constant int *_hdrImageWidth, __constant int *_hdrImageHeight,
 	__global unsigned int *_randSeeds,
 	__constant Camera *_camera,
 	__global Sphere      *_spheres,       __constant int *_sphereCount,
@@ -568,7 +577,10 @@ __kernel void pixel_colour(
 	int global_id = get_global_id(0);
 
 	ulong seed = _randSeeds[global_id];
-
+	
+	Vec3 *hdrImage = _hdrImage;
+	int hdrImageWidth = *_hdrImageWidth;
+	int hdrImageHeight = *_hdrImageHeight;
 	Camera camera = *_camera;
 	Sphere *spheres = _spheres;
 	int sphereCount = *_sphereCount;
@@ -578,6 +590,7 @@ __kernel void pixel_colour(
 	int boundingBoxCount = *_boundingBoxCount;
 
 	Vec3 pixelColour = {0.0, 0.0, 0.0};
+	Vec3 colourToAdd = {0.0, 0.0, 0.0};
 
 	for (int i = 0; i < camera.samplesPerPixel; i++)
 	{
@@ -585,8 +598,36 @@ __kernel void pixel_colour(
 		float v = ((float)(global_id / camera.width) + RandFloatFromSeed(&seed)) / camera.height;
 
 		Ray ray = GetRay(camera, u, v);
-		pixelColour = Vec3AddVec3(pixelColour, RayColour(ray, camera.maxDepth, spheres, sphereCount, triangles, triangleCount, boundingBoxes, boundingBoxCount, &seed));
+		colourToAdd = RayColour(ray, camera.maxDepth, hdrImage, hdrImageWidth, hdrImageHeight, spheres, sphereCount, triangles, triangleCount, boundingBoxes, boundingBoxCount, &seed);
+
+		if (colourToAdd.x > 1.0f) colourToAdd.x = 1.0f;
+		if (colourToAdd.y > 1.0f) colourToAdd.y = 1.0f;
+		if (colourToAdd.z > 1.0f) colourToAdd.z = 1.0f;
+
+		if (colourToAdd.x < 0.0f) colourToAdd.x = 0.0f;
+		if (colourToAdd.y < 0.0f) colourToAdd.y = 0.0f;
+		if (colourToAdd.z < 0.0f) colourToAdd.z = 0.0f;
+
+		if (isnan(colourToAdd.x)) colourToAdd.x = pixelColour.x;
+		if (isnan(colourToAdd.y)) colourToAdd.y = pixelColour.y;
+		if (isnan(colourToAdd.z)) colourToAdd.z = pixelColour.z;
+
+		pixelColour = Vec3AddVec3(pixelColour, colourToAdd);
 	}
-	
+
 	RGB[global_id] = Vec3DivFloat(pixelColour, camera.samplesPerPixel / 255.0f);
+
+	// print out progress
+	if (global_id == 0)
+	{
+		printf("Approx Progress: 0%%");
+	}
+	else if (global_id == get_global_size(0) - 1)
+	{
+		printf("\rApprox Progress: 100%%\n");
+	}
+	else if (global_id % (get_global_size(0) / 100) == 0)
+	{
+		printf("\rApprox Progress: %d%%", (int)((float)global_id / (float)get_global_size(0) * 100.0f));
+	}
 }

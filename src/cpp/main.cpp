@@ -14,6 +14,8 @@
 #include "opencl_objects/cl_sphere.hpp"
 #include "opencl_objects/cl_vec3.hpp"
 
+#include "lib/hdrloader.hpp"
+
 unsigned char image[IMAGE_WIDTH][IMAGE_HEIGHT][BYTES_PER_PIXEL];
 
 int main()
@@ -82,10 +84,10 @@ int main()
 	CLCamera *camera = (CLCamera*)malloc(sizeof(CLCamera));
 	CalculateCamera(
 		camera,
-		CLVec3{ -3.5f, 0.2f,  1.5f },
+		CLVec3{ -1.3f, 0.2f,  0.5f },
 		CLVec3{  0.2f, 0.0f, -1.5f },
 		CLVec3{  0.0f, 1.0f,  0.0f },
-		20.0f,
+		60.0f,
 		ASPECT_RATIO
 	);
 	camera->width = IMAGE_WIDTH;
@@ -96,12 +98,12 @@ int main()
 
 	cl_int numSpheres = 6;
 	CLSphere *spheres = (CLSphere*)malloc(numSpheres * sizeof(CLSphere));
-	spheres[0] = CreateSphere(CreateVec3( 0.0f, -100.5f, -1.0f), 100.0f, CreateMaterial(CreateVec3(0.0f, 0.8f, 0.7f), 0.0f, 0.0f, 0));
+	spheres[0] = CreateSphere(CreateVec3( 0.0f, -100.5f, -1.0f), 100.0f, CreateMaterial(CreateVec3(0.3f, 0.5f, 0.4f), 0.0f, 0.0f, 0));
 	spheres[1] = CreateSphere(CreateVec3( 1.6f,    0.0f, -1.3f),   0.5f, CreateMaterial(CreateVec3(0.7f, 0.3f, 0.9f), 0.0f, 0.0f, 0));
 	spheres[2] = CreateSphere(CreateVec3(-0.5f,    0.0f, -2.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.2f, 0.0f, 1));
-	spheres[3] = CreateSphere(CreateVec3( 0.5f,   -0.2f, -1.8f),   0.3f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
+	spheres[3] = CreateSphere(CreateVec3( 0.6f,    0.1f, -1.9f),   0.6f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
 	spheres[4] = CreateSphere(CreateVec3( 0.2f,  -0.35f, -0.4f),  0.15f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
-	spheres[5] = CreateSphere(CreateVec3(-0.8f,   -0.4f, -1.6f),   0.1f, CreateMaterial(CreateVec3(1.0f, 1.0f, 1.0f), 0.0f, 0.0f, 3));
+	spheres[5] = CreateSphere(CreateVec3(-0.4f,   -0.4f, -0.6f),   0.1f, CreateMaterial(CreateVec3(1.0f, 1.0f, 1.0f), 0.0f, 0.0f, 3));
 
 
 	printf("Generating triangles from mesh...\n");
@@ -132,7 +134,7 @@ int main()
 
 	CLVec3 *vertices = (CLVec3*)malloc(numVertices * sizeof(CLVec3));
 	CLTriangle *triangles = (CLTriangle*)malloc(numTriangles * sizeof(CLTriangle));
-	int numBoundingBoxes = 1;
+	cl_int numBoundingBoxes = 1;
 	CLBoundingBox *boundingBoxes = (CLBoundingBox*)malloc(numBoundingBoxes * sizeof(CLBoundingBox));
 
 	CLVec3 min = CreateVec3(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
@@ -217,6 +219,40 @@ int main()
 
 	boundingBoxes[0] = (CLBoundingBox){0, min, max};
 
+	HDRLoaderResult result;
+	bool ret = HDRLoader::load("skybox.hdr", result);
+	if (ret)
+	{
+		printf("HDR image loaded, size: %d x %d\n", result.width, result.height);
+	}
+	else
+	{
+		printf("Error loading HDR image\n");
+		return -1;
+	}
+	
+	CLVec3 *hdrImageData = (CLVec3*)malloc(result.width * result.height * sizeof(CLVec3));
+	for (int i = 0; i < result.width * result.height; i++)
+	{
+		float r = result.cols[i * 3 + 0];
+		float g = result.cols[i * 3 + 1];
+		float b = result.cols[i * 3 + 2];
+
+		// arbitrary gamma correction
+		int hdrExposure = 2;
+		hdrExposure = hdrExposure * 2 + 1;
+		r = 1 + (1 / (pow(-1 - r, hdrExposure)));
+		g = 1 + (1 / (pow(-1 - g, hdrExposure)));
+		b = 1 + (1 / (pow(-1 - b, hdrExposure)));
+
+		hdrImageData[i] = CreateVec3(r, g, b);
+	}
+	cl_int hdrImageDataWidth = result.width;
+	cl_int hdrImageDataHeight = result.height;
+
+
+
+
 
 	imageDataWidth[0] = IMAGE_WIDTH;
 	imageDataHeight[0] = IMAGE_HEIGHT;
@@ -247,27 +283,33 @@ int main()
 
 	printf("Allocating GPU memory...\n");
 	cl::Buffer bufferImageData(context, CL_MEM_WRITE_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3));
-	cl::Buffer bufferRandomSeeds(context, CL_MEM_READ_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned int));
+	cl::Buffer bufferHDRImageData(context, CL_MEM_READ_ONLY, result.width * result.height * sizeof(CLVec3));
+	cl::Buffer bufferHDRImageDataWidth(context, CL_MEM_READ_ONLY, sizeof(cl_int));
+	cl::Buffer bufferHDRImageDataHeight(context, CL_MEM_READ_ONLY, sizeof(cl_int));
+	cl::Buffer bufferRandomSeeds(context, CL_MEM_READ_ONLY, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned cl_int));
 	cl::Buffer bufferCamera(context, CL_MEM_READ_ONLY, sizeof(CLCamera));
 	cl::Buffer bufferSpheres(context, CL_MEM_READ_ONLY, numSpheres * sizeof(CLSphere));
-	cl::Buffer bufferNumSpheres(context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer bufferNumSpheres(context, CL_MEM_READ_ONLY, sizeof(cl_int));
 	cl::Buffer bufferTriangles(context, CL_MEM_READ_ONLY, numTriangles * sizeof(CLTriangle));
-	cl::Buffer bufferNumTriangles(context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer bufferNumTriangles(context, CL_MEM_READ_ONLY, sizeof(cl_int));
 	cl::Buffer bufferBoundingBoxes(context, CL_MEM_READ_ONLY, numBoundingBoxes * sizeof(CLBoundingBox));
-	cl::Buffer bufferNumBoundingBoxes(context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer bufferNumBoundingBoxes(context, CL_MEM_READ_ONLY, sizeof(cl_int));
 
 	cl::CommandQueue queue(context, defaultDevice);
 
 	printf("Writing to GPU memory...\n");
 	queue.enqueueWriteBuffer(bufferImageData, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3), imageData);
+	queue.enqueueWriteBuffer(bufferHDRImageData, CL_TRUE, 0, result.width * result.height * sizeof(CLVec3), hdrImageData);
+	queue.enqueueWriteBuffer(bufferHDRImageDataWidth, CL_TRUE, 0, sizeof(cl_int), &hdrImageDataWidth);
+	queue.enqueueWriteBuffer(bufferHDRImageDataHeight, CL_TRUE, 0, sizeof(cl_int), &hdrImageDataHeight);
 	queue.enqueueWriteBuffer(bufferRandomSeeds, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned int), randomSeeds);
 	queue.enqueueWriteBuffer(bufferCamera, CL_TRUE, 0, sizeof(CLCamera), camera);
 	queue.enqueueWriteBuffer(bufferSpheres, CL_TRUE, 0, numSpheres * sizeof(CLSphere), spheres);
-	queue.enqueueWriteBuffer(bufferNumSpheres, CL_TRUE, 0, sizeof(int), &numSpheres);
+	queue.enqueueWriteBuffer(bufferNumSpheres, CL_TRUE, 0, sizeof(cl_int), &numSpheres);
 	queue.enqueueWriteBuffer(bufferTriangles, CL_TRUE, 0, numTriangles * sizeof(CLTriangle), triangles);
-	queue.enqueueWriteBuffer(bufferNumTriangles, CL_TRUE, 0, sizeof(int), &numTriangles);
+	queue.enqueueWriteBuffer(bufferNumTriangles, CL_TRUE, 0, sizeof(cl_int), &numTriangles);
 	queue.enqueueWriteBuffer(bufferBoundingBoxes, CL_TRUE, 0, numBoundingBoxes * sizeof(CLBoundingBox), boundingBoxes);
-	queue.enqueueWriteBuffer(bufferNumBoundingBoxes, CL_TRUE, 0, sizeof(int), &numBoundingBoxes);
+	queue.enqueueWriteBuffer(bufferNumBoundingBoxes, CL_TRUE, 0, sizeof(cl_int), &numBoundingBoxes);
 
 	printf("Setting kernel arguments...\n");
 	cl::Kernel kernel(program, "pixel_colour");
@@ -284,14 +326,17 @@ int main()
 	cl::NDRange local(workGroupSize); // amount of pixels to process per work group
 
 	kernel.setArg(0, bufferImageData);
-	kernel.setArg(1, bufferRandomSeeds);
-	kernel.setArg(2, bufferCamera);
-	kernel.setArg(3, bufferSpheres);
-	kernel.setArg(4, bufferNumSpheres);
-	kernel.setArg(5, bufferTriangles);
-	kernel.setArg(6, bufferNumTriangles);
-	kernel.setArg(7, bufferBoundingBoxes);
-	kernel.setArg(8, bufferNumBoundingBoxes);
+	kernel.setArg(1, bufferHDRImageData);
+	kernel.setArg(2, bufferHDRImageDataWidth);
+	kernel.setArg(3, bufferHDRImageDataHeight);
+	kernel.setArg(4, bufferRandomSeeds);
+	kernel.setArg(5, bufferCamera);
+	kernel.setArg(6, bufferSpheres);
+	kernel.setArg(7, bufferNumSpheres);
+	kernel.setArg(8, bufferTriangles);
+	kernel.setArg(9, bufferNumTriangles);
+	kernel.setArg(10, bufferBoundingBoxes);
+	kernel.setArg(11, bufferNumBoundingBoxes);
 
 	std::chrono::steady_clock::time_point endKernel = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endKernel- beginKernel).count() / 1000000);
@@ -313,6 +358,9 @@ int main()
 
 	printf(" === Rendering ===\nGPU memory usage: %d KB\n", (
 		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(CLVec3) + // imageDataBuffer
+		result.width * result.height * sizeof(CLVec3) + // hdrImageDataBuffer
+		sizeof(int) + // imageDataWidthBuffer
+		sizeof(int) + // imageDataHeightBuffer
 		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(unsigned int) + // randomSeeds
 		sizeof(CLCamera) + // cameraBuffer
 		numSpheres * sizeof(CLSphere) + // spheresBuffer

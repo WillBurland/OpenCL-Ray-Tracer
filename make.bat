@@ -20,6 +20,7 @@ g++ -std=c++17 -O2 ^
 ../src/cpp/opencl_objects/cl_sphere.cpp ^
 ../src/cpp/opencl_objects/cl_triangle.cpp ^
 ../src/cpp/opencl_objects/cl_vec3.cpp ^
+../src/cpp/lib/hdrloader.cpp ^
 -I"C:\OpenCL\include" ^
 -L"C:\OpenCL\lib" ^
 -lOpenCL ^
