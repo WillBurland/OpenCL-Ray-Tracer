@@ -11,7 +11,7 @@ The initial inspiration and general implementation techniques came from Peter Sh
 
 ## Sample image from a recent commit
 
-![output](https://github.com/Will1162/OpenCL-Ray-Tracer/assets/39223201/d495b93f-8e34-4c5c-bbcb-17a118aefc4b)
+![output](https://github.com/Will1162/OpenCL-Ray-Tracer/assets/39223201/a37c52e9-b17d-4278-ad58-98562e1c5657)
 
 ## Comparison to Legacy-Ray-Tracer
 
@@ -53,7 +53,6 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 
 - Texture support
 - Scene descriptor JSON file
-- Depth of field
 - Specular reflection
 - Code cleanup and commenting
 
