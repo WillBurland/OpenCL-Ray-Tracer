@@ -15,6 +15,7 @@ g++ -std=c++17 -O2 ^
 ../src/cpp/bitmap_io.cpp ^
 ../src/cpp/colour.cpp ^
 ../src/cpp/vec3.cpp ^
+../src/cpp/opencl_objects/cl_camera.cpp ^
 ../src/cpp/opencl_objects/cl_bounding_box.cpp ^
 ../src/cpp/opencl_objects/cl_material.cpp ^
 ../src/cpp/opencl_objects/cl_sphere.cpp ^

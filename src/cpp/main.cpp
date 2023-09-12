@@ -9,6 +9,7 @@
 #include "colour.hpp"
 #include "globals.hpp"
 #include "vec3.hpp"
+#include "opencl_objects/cl_camera.hpp"
 #include "opencl_objects/cl_bounding_box.hpp"
 #include "opencl_objects/cl_triangle.hpp"
 #include "opencl_objects/cl_sphere.hpp"
@@ -83,12 +84,14 @@ int main()
 
 	CLCamera *camera = (CLCamera*)malloc(sizeof(CLCamera));
 	CalculateCamera(
-		camera,
-		CLVec3{ -1.3f, 0.2f,  0.5f },
-		CLVec3{  0.2f, 0.0f, -1.5f },
-		CLVec3{  0.0f, 1.0f,  0.0f },
-		60.0f,
-		ASPECT_RATIO
+		camera,                       // camera
+		CLVec3{ -1.3f, 0.2f,  0.5f }, // position
+		CLVec3{  0.2f, 0.0f, -1.5f }, // look at
+		CLVec3{  0.0f, 1.0f,  0.0f }, // up (used for rotation)
+		60.0f,                        // field of view
+		ASPECT_RATIO,                 // aspect ratio
+		2.0f,                         // focus distance
+		1.2f                          // aperture
 	);
 	camera->width = IMAGE_WIDTH;
 	camera->height = IMAGE_HEIGHT;
@@ -96,14 +99,16 @@ int main()
 	camera->maxDepth = MAX_DEPTH;
 
 
-	cl_int numSpheres = 6;
+	cl_int numSpheres = 8;
 	CLSphere *spheres = (CLSphere*)malloc(numSpheres * sizeof(CLSphere));
-	spheres[0] = CreateSphere(CreateVec3( 0.0f, -100.5f, -1.0f), 100.0f, CreateMaterial(CreateVec3(0.3f, 0.5f, 0.4f), 0.0f, 0.0f, 0));
-	spheres[1] = CreateSphere(CreateVec3( 1.6f,    0.0f, -1.3f),   0.5f, CreateMaterial(CreateVec3(0.7f, 0.3f, 0.9f), 0.0f, 0.0f, 0));
-	spheres[2] = CreateSphere(CreateVec3(-0.5f,    0.0f, -2.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.2f, 0.0f, 1));
-	spheres[3] = CreateSphere(CreateVec3( 0.6f,    0.1f, -1.9f),   0.6f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1));
-	spheres[4] = CreateSphere(CreateVec3( 0.2f,  -0.35f, -0.4f),  0.15f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2));
-	spheres[5] = CreateSphere(CreateVec3(-0.4f,   -0.4f, -0.6f),   0.1f, CreateMaterial(CreateVec3(1.0f, 1.0f, 1.0f), 0.0f, 0.0f, 3));
+	spheres[0] = CreateSphere(CreateVec3( 0.0f, -100.5f, -1.0f), 100.0f, CreateMaterial(CreateVec3(0.3f, 0.5f, 0.4f), 0.0f, 0.0f, 0)); // ground
+	spheres[1] = CreateSphere(CreateVec3( 1.6f,    0.0f, -1.3f),   0.5f, CreateMaterial(CreateVec3(0.7f, 0.3f, 0.9f), 0.0f, 0.0f, 0)); // purple diffuse
+	spheres[2] = CreateSphere(CreateVec3(-0.5f,    0.0f, -2.0f),   0.5f, CreateMaterial(CreateVec3(0.8f, 0.5f, 0.5f), 0.2f, 0.0f, 1)); // fuzzy pink mirror
+	spheres[3] = CreateSphere(CreateVec3( 0.6f,    0.1f, -1.9f),   0.6f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 0.0f, 1)); // perfect mirror
+	spheres[4] = CreateSphere(CreateVec3( 0.2f,  -0.35f, -0.4f),  0.15f, CreateMaterial(CreateVec3(0.8f, 0.8f, 0.8f), 0.0f, 1.5f, 2)); // glass
+	spheres[5] = CreateSphere(CreateVec3(-0.4f,   -0.4f, -0.6f),   0.1f, CreateMaterial(CreateVec3(1.0f, 1.0f, 1.0f), 0.0f, 0.0f, 3)); // light
+	spheres[6] = CreateSphere(CreateVec3(-0.2f,   -0.1f,  0.6f),   0.4f, CreateMaterial(CreateVec3(0.5f, 0.5f, 0.8f), 0.0f, 0.0f, 1)); // foreground blue mirror
+	spheres[7] = CreateSphere(CreateVec3(-1.5f,   -0.1f, -5.0f),   0.5f, CreateMaterial(CreateVec3(0.5f, 0.8f, 0.5f), 0.0f, 0.0f, 1)); // background green mirror
 
 
 	printf("Generating triangles from mesh...\n");

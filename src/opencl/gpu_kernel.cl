@@ -58,10 +58,14 @@ typedef struct
 	Vec3 horizontal;
 	Vec3 vertical;
 	Vec3 lowerLeftCorner;
+	Vec3 defocusDiscU;
+	Vec3 defocusDiscV;
 	int width;
 	int height;
 	int samplesPerPixel;
 	int maxDepth;
+	float focusDistance;
+	float aperture;
 } Camera;
 
 // ===== FUNCTION DEFINITIONS =====
@@ -93,11 +97,12 @@ bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *sc
 bool HitSphere(Sphere s, Ray r, float tMin, float tMax, HitRecord *hit);
 bool HitTriangle(Triangle t, Ray r, float tMin, float tMax, HitRecord *hit);
 bool HitBoundingBox(Vec3 min, Vec3 max, Ray r);
-Ray GetRay(Camera camera, float s, float t);
+Ray GetRay(Camera camera, float s, float t, ulong *seed);
 ulong NextSeed(ulong seed);
 float RandFloatFromSeed(ulong *seed);
 float DegToRad(float degrees);
 float* Vec3ToUV(Vec3 v);
+Vec3 Vec3RandInUnitDisk(ulong *seed);
 
 // ===== VECTOR FUNCTIONS =====
 
@@ -234,7 +239,22 @@ float* Vec3ToUV(Vec3 n)
 	uv[0] = 0.5f + atan2(n.z, n.x) / (2.0f * (float)M_PI);
 	uv[1] = 0.5f - asin(n.y) / (float)M_PI;
 	return uv;
-	
+}
+
+Vec3 Vec3RandInUnitDisk(ulong *seed)
+{
+	Vec3 p;
+	while (true)
+	{
+		float randX = RandFloatFromSeed(seed) * 2.0f - 1.0f;
+		float randY = RandFloatFromSeed(seed) * 2.0f - 1.0f;
+		float randZ = 0.0f;
+
+		p = (Vec3){ randX, randY, randZ };
+
+		if (Vec3LengthSquared(p) >= 1.0f) continue;
+		return p;
+	}
 }
 
 // ===== RAY FUNCTIONS =====
@@ -396,7 +416,7 @@ bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scatter
 {
 	Vec3 reflected = Vec3Reflect(Vec3Unit(ray.direction), hitRecord->normal);
 	scattered->origin = hitRecord->p;
-	scattered->direction = Vec3AddVec3(reflected, Vec3MulFloat(Vec3RandInUnitSphere(seed), hitRecord->material.fuzz));
+	scattered->direction = hitRecord->material.fuzz > 0.0f ? Vec3AddVec3(reflected, Vec3MulFloat(Vec3RandInUnitSphere(seed), hitRecord->material.fuzz)) : reflected;
 	scattered->invDirection = Vec3Inv(scattered->direction);
 	*attenuation = hitRecord->material.albedo;
 	return Vec3Dot(scattered->direction, hitRecord->normal) > 0;
@@ -536,11 +556,23 @@ bool HitBoundingBox(Vec3 min, Vec3 max, Ray r)
 
 // ===== CAMERA FUNCTIONS =====
 
-Ray GetRay(Camera camera, float s, float t)
+Ray GetRay(Camera camera, float u, float v, ulong *seed)
 {
 	Ray result;
-	result.origin = camera.origin;
-	result.direction = Vec3SubVec3(Vec3AddVec3(Vec3AddVec3(camera.lowerLeftCorner, Vec3MulFloat(camera.horizontal, s)), Vec3MulFloat(camera.vertical, t)), camera.origin);
+	
+	if (camera.aperture <= 0)
+	{
+		result.origin = camera.origin;
+	}
+	else
+	{
+		Vec3 p = Vec3RandInUnitDisk(seed);
+		Vec3 diskU = Vec3MulFloat(camera.defocusDiscU, p.x);
+		Vec3 diskV = Vec3MulFloat(camera.defocusDiscV, p.y);
+		result.origin = Vec3AddVec3(camera.origin, Vec3AddVec3(diskU, diskV));
+	}
+
+	result.direction = Vec3SubVec3(Vec3AddVec3(camera.lowerLeftCorner, Vec3AddVec3(Vec3MulFloat(camera.horizontal, u), Vec3MulFloat(camera.vertical, v))), result.origin);
 	result.invDirection = Vec3Inv(result.direction);
 	return result;
 }
@@ -597,7 +629,7 @@ __kernel void pixel_colour(
 		float u = ((float)(global_id % camera.width) + RandFloatFromSeed(&seed)) / camera.width;
 		float v = ((float)(global_id / camera.width) + RandFloatFromSeed(&seed)) / camera.height;
 
-		Ray ray = GetRay(camera, u, v);
+		Ray ray = GetRay(camera, u, v, &seed);
 		colourToAdd = RayColour(ray, camera.maxDepth, hdrImage, hdrImageWidth, hdrImageHeight, spheres, sphereCount, triangles, triangleCount, boundingBoxes, boundingBoxCount, &seed);
 
 		if (colourToAdd.x > 1.0f) colourToAdd.x = 1.0f;
