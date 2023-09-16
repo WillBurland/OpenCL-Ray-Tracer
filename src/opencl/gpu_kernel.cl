@@ -80,6 +80,7 @@ Vec3 Vec3Cross(Vec3 a, Vec3 b);
 Vec3 Vec3Unit(Vec3 a);
 Vec3 Vec3RandInUnitSphere(ulong *seed);
 Vec3 Vec3RandUnitVector(ulong *seed);
+bool Vec3NearZero(Vec3 a);
 Vec3 Vec3Reflect(Vec3 v, Vec3 n);
 Vec3 Vec3Refract(Vec3 uv, Vec3 n, float etaiOverEtat);
 float Vec3Reflectance(float cosine, float refIdx);
@@ -195,6 +196,12 @@ Vec3 Vec3RandInUnitSphere(ulong *seed)
 Vec3 Vec3RandUnitVector(ulong *seed)
 {
 	return Vec3Unit(Vec3RandInUnitSphere(seed));
+}
+
+bool Vec3NearZero(Vec3 a)
+{
+	const float s = 1e-8;
+	return (fabs(a.x) < s) && (fabs(a.y) < s) && (fabs(a.z) < s);
 }
 
 Vec3 Vec3Reflect(Vec3 v, Vec3 n)
