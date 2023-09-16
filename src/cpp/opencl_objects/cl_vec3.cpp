@@ -1,61 +1,67 @@
 #include "cl_vec3.hpp"
 
-CLVec3 Vec3SubVec3(CLVec3 a, CLVec3 b)
+cl_vec3 CreateVec3(float x, float y, float z)
 {
-	CLVec3 result;
-	result.x = a.x - b.x;
-	result.y = a.y - b.y;
-	result.z = a.z - b.z;
+	cl_vec3 result;
+	result.x = x;
+	result.y = y;
+	result.z = z;
 	return result;
 }
 
-CLVec3 Vec3MulFloat(CLVec3 a, float b)
+cl_vec3 Vec3Cross(cl_vec3 a, cl_vec3 b)
 {
-	CLVec3 result;
-	result.x = a.x * b;
-	result.y = a.y * b;
-	result.z = a.z * b;
-	return result;
-}
-
-CLVec3 Vec3DivFloat(CLVec3 a, float b)
-{
-	CLVec3 result;
-	result.x = a.x / b;
-	result.y = a.y / b;
-	result.z = a.z / b;
-	return result;
-}
-
-CLVec3 Vec3Cross(CLVec3 a, CLVec3 b)
-{
-	CLVec3 result;
+	cl_vec3 result;
 	result.x = a.y * b.z - a.z * b.y;
 	result.y = a.z * b.x - a.x * b.z;
 	result.z = a.x * b.y - a.y * b.x;
 	return result;
 }
 
-float Vec3LengthSquared(CLVec3 a)
+float Vec3LengthSquared(cl_vec3 a)
 {
 	return a.x * a.x + a.y * a.y + a.z * a.z;
 }
 
-float Vec3Length(CLVec3 a)
+float Vec3Length(cl_vec3 a)
 {
 	return sqrt(Vec3LengthSquared(a));
 }
 
-CLVec3 Vec3Unit(CLVec3 a)
+
+cl_vec3 Vec3Unit(cl_vec3 a)
 {
-	return Vec3DivFloat(a, Vec3Length(a));
+	return a / Vec3Length(a);
 }
 
-CLVec3 CreateVec3(float x, float y, float z)
+cl_vec3 operator+(cl_vec3 a, cl_vec3 b)
 {
-	CLVec3 result;
-	result.x = x;
-	result.y = y;
-	result.z = z;
-	return result;
+	a.x += b.x;
+	a.y += b.y;
+	a.z += b.z;
+	return a;
+}
+
+cl_vec3 operator-(cl_vec3 a, cl_vec3 b)
+{
+	a.x -= b.x;
+	a.y -= b.y;
+	a.z -= b.z;
+	return a;
+}
+
+cl_vec3 operator*(cl_vec3 a, float b)
+{
+	a.x *= b;
+	a.y *= b;
+	a.z *= b;
+	return a;
+}
+
+cl_vec3 operator/(cl_vec3 a, float b)
+{
+	a.x /= b;
+	a.y /= b;
+	a.z /= b;
+	return a;
 }

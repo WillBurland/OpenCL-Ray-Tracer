@@ -2,24 +2,23 @@
 #define WB_RT_CL_CAMERA_HPP
 
 #include "cl_vec3.hpp"
-#include "../globals.hpp"
 
-typedef struct
+struct cl_camera
 {
-	CLVec3 origin;
-	CLVec3 horizontal;
-	CLVec3 vertical;
-	CLVec3 lowerLeftCorner;
-	CLVec3 defocusDiscU;
-	CLVec3 defocusDiscV;
-	cl_int width;
-	cl_int height;
-	cl_int samplesPerPixel;
-	cl_int maxDepth;
+	cl_vec3  origin;
+	cl_vec3  horizontal;
+	cl_vec3  vertical;
+	cl_vec3  lowerLeftCorner;
+	cl_vec3  defocusDiscU;
+	cl_vec3  defocusDiscV;
+	cl_int   width;
+	cl_int   height;
+	cl_int   samplesPerPixel;
+	cl_int   maxDepth;
 	cl_float focusDistance;
 	cl_float aperture;
-} CLCamera;
+};
 
-void CalculateCamera(CLCamera *camera, CLVec3 lookFrom, CLVec3 lookAt, CLVec3 vUp, float vFov, float aspectRatio, float focusDistance, float aperture);
+void CalculateCamera(cl_camera *camera, cl_vec3 lookFrom, cl_vec3 lookAt, cl_vec3 vUp, float vFov, float aspectRatio, float focusDistance, float aperture);
 
 #endif

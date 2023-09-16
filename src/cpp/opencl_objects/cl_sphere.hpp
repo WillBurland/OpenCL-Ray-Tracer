@@ -3,17 +3,14 @@
 
 #include "cl_material.hpp"
 #include "cl_vec3.hpp"
-#include "../globals.hpp"
 
-typedef struct
+struct cl_sphere
 {
-	CLVec3 center;
-	cl_float radius;
-	CLMaterial material;
-	CLVec3 boundingBoxMin;
-	CLVec3 boundingBoxMax;
-} CLSphere;
+	cl_vec3     center;
+	cl_float    radius;
+	cl_material material;
+};
 
-CLSphere CreateSphere(CLVec3 center, cl_float radius, CLMaterial material);
+cl_sphere CreateSphere(cl_vec3 center, cl_float radius, cl_material material);
 
 #endif

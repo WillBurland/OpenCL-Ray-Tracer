@@ -1,10 +1,10 @@
 #ifndef WB_RT_COLOUR_HPP
 #define WB_RT_COLOUR_HPP
 
-#include "vec3.hpp"
+#include <cmath>
 
-extern unsigned char image[IMAGE_WIDTH][IMAGE_HEIGHT][BYTES_PER_PIXEL];
+#include "opencl_objects/cl_vec3.hpp"
 
-void WriteColour(int x, int y, int width, int height, Colour pixelColour);
+void WriteColour(int x, int y, int width, int height, cl_vec3 pixelColour);
 
 #endif

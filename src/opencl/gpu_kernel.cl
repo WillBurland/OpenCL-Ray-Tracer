@@ -14,56 +14,54 @@ typedef struct
 
 typedef struct
 {
-	Vec3 albedo;
+	Vec3  albedo;
 	float fuzz;
 	float ior;
-	int type;
+	int   type;
 } Material;
 
 typedef struct
 {
-	Vec3 center;
-	float radius;
+	Vec3     center;
+	float    radius;
 	Material material;
-	Vec3 boundingBoxMin;
-	Vec3 boundingBoxMax;
 } Sphere;
 
 typedef struct
 {
-	Vec3 p0, p1, p2;
+	Vec3     p0, p1, p2;
 	Material material;
-	int boundingBoxId;
+	int      boundingBoxId;
 } Triangle;
 
 typedef struct
 {
-	int id;
+	int  id;
 	Vec3 min;
 	Vec3 max;
 } BoundingBox;
 
 typedef struct
 {
-	Vec3 p;
-	Vec3 normal;
-	float t;
-	bool frontFace;
+	Vec3     p;
+	Vec3     normal;
+	float    t;
+	bool     frontFace;
 	Material material;
 } HitRecord;
 
 typedef struct
 {
-	Vec3 origin;
-	Vec3 horizontal;
-	Vec3 vertical;
-	Vec3 lowerLeftCorner;
-	Vec3 defocusDiscU;
-	Vec3 defocusDiscV;
-	int width;
-	int height;
-	int samplesPerPixel;
-	int maxDepth;
+	Vec3  origin;
+	Vec3  horizontal;
+	Vec3  vertical;
+	Vec3  lowerLeftCorner;
+	Vec3  defocusDiscU;
+	Vec3  defocusDiscV;
+	int   width;
+	int   height;
+	int   samplesPerPixel;
+	int   maxDepth;
 	float focusDistance;
 	float aperture;
 } Camera;
@@ -82,11 +80,12 @@ Vec3 Vec3Cross(Vec3 a, Vec3 b);
 Vec3 Vec3Unit(Vec3 a);
 Vec3 Vec3RandInUnitSphere(ulong *seed);
 Vec3 Vec3RandUnitVector(ulong *seed);
-bool Vec3NearZero(Vec3 a);
 Vec3 Vec3Reflect(Vec3 v, Vec3 n);
 Vec3 Vec3Refract(Vec3 uv, Vec3 n, float etaiOverEtat);
 float Vec3Reflectance(float cosine, float refIdx);
 Vec3 Vec3Inv(Vec3 a);
+float* Vec3ToUV(Vec3 n);
+Vec3 Vec3RandInUnitDisk(ulong *seed);
 Vec3 RayAt(Ray ray, float t);
 Vec3 RayColour(Ray ray, int maxDepth, Vec3 *hdrImage, int hdrImageWidth, int hdrImageHeight, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount, ulong *seed);
 void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal);
@@ -97,12 +96,9 @@ bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *sc
 bool HitSphere(Sphere s, Ray r, float tMin, float tMax, HitRecord *hit);
 bool HitTriangle(Triangle t, Ray r, float tMin, float tMax, HitRecord *hit);
 bool HitBoundingBox(Vec3 min, Vec3 max, Ray r);
-Ray GetRay(Camera camera, float s, float t, ulong *seed);
+Ray GetRay(Camera camera, float u, float v, ulong *seed);
 ulong NextSeed(ulong seed);
 float RandFloatFromSeed(ulong *seed);
-float DegToRad(float degrees);
-float* Vec3ToUV(Vec3 v);
-Vec3 Vec3RandInUnitDisk(ulong *seed);
 
 // ===== VECTOR FUNCTIONS =====
 
@@ -199,12 +195,6 @@ Vec3 Vec3RandInUnitSphere(ulong *seed)
 Vec3 Vec3RandUnitVector(ulong *seed)
 {
 	return Vec3Unit(Vec3RandInUnitSphere(seed));
-}
-
-bool Vec3NearZero(Vec3 a)
-{
-	const float s = 1e-8;
-	return (fabs(a.x) < s) && (fabs(a.y) < s) && (fabs(a.z) < s);
 }
 
 Vec3 Vec3Reflect(Vec3 v, Vec3 n)
@@ -395,6 +385,7 @@ bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *
 }
 
 // ===== SCATTER FUNCTIONS =====
+
 bool LambertianScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed)
 {
 	Vec3 scatterDir = Vec3AddVec3(hitRecord->normal, Vec3RandUnitVector(seed));
@@ -578,6 +569,7 @@ Ray GetRay(Camera camera, float u, float v, ulong *seed)
 }
 
 // ===== RANDOM FUNCTIONS =====
+
 ulong NextSeed(ulong seed)
 {
 	return (seed * 0x5DEECE66D + 0xB) & ((1ULL << 48) - 1);
@@ -587,12 +579,6 @@ float RandFloatFromSeed(ulong *seed)
 {
 	*seed = NextSeed(*seed);
 	return (float)(*seed >> 16) / 0xFFFFFFFF;
-}
-
-// ===== OTHER FUNCTIONS =====
-float DegToRad(float degrees)
-{
-	return degrees * (float)M_PI / 180.0f;
 }
 
 // ===== MAIN FUNCTION =====
@@ -647,7 +633,7 @@ __kernel void pixel_colour(
 		pixelColour = Vec3AddVec3(pixelColour, colourToAdd);
 	}
 
-	RGB[global_id] = Vec3DivFloat(pixelColour, camera.samplesPerPixel / 255.0f);
+	RGB[global_id] = Vec3DivFloat(pixelColour, camera.samplesPerPixel);
 
 	// print out progress
 	if (global_id == 0)

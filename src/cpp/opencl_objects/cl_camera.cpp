@@ -1,40 +1,40 @@
 #include "cl_camera.hpp"
 
-void CalculateCamera(CLCamera *camera, CLVec3 lookFrom, CLVec3 lookAt, CLVec3 vUp, float vFov, float aspectRatio, float focusDistance, float aperture)
+void CalculateCamera(cl_camera *camera, cl_vec3 lookFrom, cl_vec3 lookAt, cl_vec3 vUp, float vFov, float aspectRatio, float focusDistance, float aperture)
 {
+	// convert vFov to radians
 	aperture *= (float)3.141592654 / 180.0f;
 
+	// calculate viewport height and width
 	float theta = vFov * (float)3.141592654 / 180.0f;
 	float h = tan(theta / 2);
 	float viewportHeight = 2.0f * h * focusDistance;
-	float viewportWidth = aspectRatio * viewportHeight;
+	float viewportWidth  = aspectRatio * viewportHeight;
+
+	// calculate camera basis vectors
+	cl_vec3 w = Vec3Unit(lookFrom - lookAt);
+	cl_vec3 u = Vec3Unit(Vec3Cross(vUp, w));
+	cl_vec3 v = Vec3Cross(w, u);
+
+	// calculate viewport corners
+	cl_vec3 viewportU   = u * viewportWidth;
+	cl_vec3 viewportV   = v * viewportHeight;
+	cl_vec3 pixelDeltaU = viewportU / (float)IMAGE_WIDTH;
+	cl_vec3 pixelDeltaV = viewportV / (float)IMAGE_HEIGHT;
+	cl_vec3 viewportLowerLeftCorner = ((lookFrom - (viewportU / 2.0f)) - (viewportV / 2.0f)) - (w * focusDistance);
 	
-	CLVec3 w = Vec3Unit(Vec3SubVec3(lookFrom, lookAt));
-	CLVec3 u = Vec3Unit(Vec3Cross(vUp, w));
-	CLVec3 v = Vec3Cross(w, u);
-
-	CLVec3 viewportU = Vec3MulFloat(u, viewportWidth);
-	CLVec3 viewportV = Vec3MulFloat(v, viewportHeight);
-
-	CLVec3 pixelDeltaU = Vec3DivFloat(viewportU, (float)IMAGE_WIDTH);
-	CLVec3 pixelDeltaV = Vec3DivFloat(viewportV, (float)IMAGE_HEIGHT);
-
-	CLVec3 viewportLowerLeftCorner = Vec3SubVec3(Vec3SubVec3(Vec3SubVec3(lookFrom, Vec3DivFloat(viewportU, 2.0f)), Vec3DivFloat(viewportV, 2.0f)), Vec3MulFloat(w, focusDistance));
-	
+	// calculate defocus disc
 	float defocusRadius = focusDistance * tan(aperture / 2.0f);
-	CLVec3 defocusDiscU = Vec3MulFloat(u, defocusRadius);
-	CLVec3 defocusDiscV = Vec3MulFloat(v, defocusRadius);
-	
-	printf("defocusDiscU: %f %f %f\n", defocusDiscU.x, defocusDiscU.y, defocusDiscU.z);
-	printf("defocusDiscV: %f %f %f\n", defocusDiscV.x, defocusDiscV.y, defocusDiscV.z);
-	printf("lowerLeftCorner %f %f %f\n", viewportLowerLeftCorner.x, viewportLowerLeftCorner.y, viewportLowerLeftCorner.z);
+	cl_vec3 defocusDiscU = u * defocusRadius;
+	cl_vec3 defocusDiscV = v * defocusRadius;
 
-	camera->origin = lookFrom;
-	camera->horizontal = viewportU;
-	camera->vertical = viewportV;
+	// set camera values
+	camera->origin          = lookFrom;
+	camera->horizontal      = viewportU;
+	camera->vertical        = viewportV;
 	camera->lowerLeftCorner = viewportLowerLeftCorner;
-	camera->defocusDiscU = defocusDiscU;
-	camera->defocusDiscV = defocusDiscV;
-	camera->focusDistance = focusDistance;
-	camera->aperture = aperture;
+	camera->defocusDiscU    = defocusDiscU;
+	camera->defocusDiscV    = defocusDiscV;
+	camera->focusDistance   = focusDistance;
+	camera->aperture        = aperture;
 }

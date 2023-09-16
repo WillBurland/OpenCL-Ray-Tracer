@@ -2,16 +2,15 @@
 #define WB_RT_CL_MATERIAL_HPP
 
 #include "cl_vec3.hpp"
-#include "../globals.hpp"
 
-typedef struct
+struct cl_material
 {
-	CLVec3 albedo;
+	cl_vec3  albedo;
 	cl_float fuzz;
 	cl_float ior;
-	cl_int type;
-} CLMaterial;
+	cl_int   type;
+};
 
-CLMaterial CreateMaterial(CLVec3 albedo, cl_float fuzz, cl_float ior, cl_int type);
+cl_material CreateMaterial(cl_vec3 albedo, cl_float fuzz, cl_float ior, cl_int type);
 
 #endif

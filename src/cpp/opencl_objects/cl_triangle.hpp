@@ -3,15 +3,14 @@
 
 #include "cl_material.hpp"
 #include "cl_vec3.hpp"
-#include "../globals.hpp"
 
-typedef struct
+struct cl_triangle
 {
-	CLVec3 p0, p1, p2;
-	CLMaterial material;
-	cl_int boundingBoxId;
-} CLTriangle;
+	cl_vec3     p0, p1, p2;
+	cl_material material;
+	cl_int      boundingBoxId;
+};
 
-CLTriangle CreateTriangle(CLVec3 p0, CLVec3 p1, CLVec3 p2, CLMaterial material, cl_int boundingBoxId);
+cl_triangle CreateTriangle(cl_vec3 p0, cl_vec3 p1, cl_vec3 p2, cl_material material, cl_int boundingBoxId);
 
 #endif

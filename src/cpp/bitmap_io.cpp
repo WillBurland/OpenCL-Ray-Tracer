@@ -3,6 +3,8 @@
 void generateBitmapImage (unsigned char* image, int height, int width, char* imageFileName)
 {
 	int widthInBytes = width * BYTES_PER_PIXEL;
+	const int FILE_HEADER_SIZE = 14;
+	const int INFO_HEADER_SIZE = 40;
 
 	unsigned char padding[3] = {0, 0, 0};
 	int paddingSize = (4 - (widthInBytes) % 4) % 4;
@@ -11,10 +13,10 @@ void generateBitmapImage (unsigned char* image, int height, int width, char* ima
 
 	FILE* imageFile = fopen(imageFileName, "wb");
 
-	unsigned char* fileHeader = createBitmapFileHeader(height, stride);
+	unsigned char* fileHeader = createBitmapFileHeader(height, stride, FILE_HEADER_SIZE, INFO_HEADER_SIZE);
 	fwrite(fileHeader, 1, FILE_HEADER_SIZE, imageFile);
 
-	unsigned char* infoHeader = createBitmapInfoHeader(height, width);
+	unsigned char* infoHeader = createBitmapInfoHeader(height, width, INFO_HEADER_SIZE);
 	fwrite(infoHeader, 1, INFO_HEADER_SIZE, imageFile);
 
 	for (int i = 0; i < height; i++)
@@ -26,7 +28,7 @@ void generateBitmapImage (unsigned char* image, int height, int width, char* ima
 	fclose(imageFile);
 }
 
-unsigned char* createBitmapFileHeader (int height, int stride)
+unsigned char* createBitmapFileHeader (int height, int stride, int FILE_HEADER_SIZE, int INFO_HEADER_SIZE)
 {
 	int fileSize = FILE_HEADER_SIZE + INFO_HEADER_SIZE + (stride * height);
 
@@ -49,7 +51,7 @@ unsigned char* createBitmapFileHeader (int height, int stride)
 	return fileHeader;
 }
 
-unsigned char* createBitmapInfoHeader (int height, int width)
+unsigned char* createBitmapInfoHeader (int height, int width, int INFO_HEADER_SIZE)
 {
 	static unsigned char infoHeader[] =
 	{

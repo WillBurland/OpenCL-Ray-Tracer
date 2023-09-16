@@ -2,15 +2,13 @@
 #define WB_RT_CL_BOUNDING_BOX_HPP
 
 #include "cl_vec3.hpp"
-#include "../globals.hpp"
 
-typedef struct
+struct cl_bounding_box
 {
-	cl_int id;
-	CLVec3 min;
-	CLVec3 max;
-} CLBoundingBox;
+	cl_int  id;
+	cl_vec3 min, max;
+};
 
-CLBoundingBox CreateBoundingBox(cl_int id, CLVec3 min, CLVec3 max);
+cl_bounding_box CreateBoundingBox(cl_int id, cl_vec3 min, cl_vec3 max);
 
 #endif
