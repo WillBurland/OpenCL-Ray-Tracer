@@ -260,12 +260,11 @@ int main()
 			}
 
 			// write image to .bmp file
-			printf("Writing image to file...\n");
 			char* fileName = (char*)malloc(256);
 			sprintf(fileName, "%s%s", imageFileName, imageFileExtension);
 			generateBitmapImage((unsigned char*)image, IMAGE_HEIGHT, IMAGE_WIDTH, fileName);
 			
-			printf("Blocks rendered: %d%%\r", (int)((float)blockNum / (float)(blockNumX * blockNumY) * 100.0f));
+			printf("Rendered block %d / %d (%d%%)\r", ++blockNum, blockNumX * blockNumY, (int)((float)blockNum / (float)(blockNumX * blockNumY) * 100.0f));
 		}
 	}
 

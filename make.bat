@@ -27,7 +27,7 @@ g++ -std=c++17 -O2 ^
 -L"C:\OpenCL\lib" ^
 -lOpenCL ^
 -DUNICODE ^
--mwindows ^
+-lgdi32 ^
 -o RayTracer-x64.exe
 
 echo Done
