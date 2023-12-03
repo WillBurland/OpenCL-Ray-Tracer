@@ -8,6 +8,7 @@ Build on top of [Ray-Tracer-Legacy](https://github.com/Will1162/Ray-Tracer-Legac
 
 The initial inspiration and general implementation techniques came from Peter Shirley's [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html). As development platforms varied, the book using C++ a CPU workflow, and myself using OpenCL and a GPU workflow, I had to find ways to adapt Peter's code to work with my own codebase, especially as OpenCL does not yet support C++ features such as classes, as it is based on C99 and has many random quirks that can make it confusing to work with.
 
+As the program runs, its output it displayed to a Win32 window, where blocks of pixels are filled in as they are finished. These blocks are customisable in size, but should only really be used in higher resolution renders. This is because at smaller resolutions, deploying more blocks causes more overhead than time saved, while in larger renders, there may be hardware limitations when allocating large buffers and GPU threads, which is where blocks are useful, to break up the workload.
 
 ## Sample image from a recent commit
 
@@ -15,7 +16,7 @@ The initial inspiration and general implementation techniques came from Peter Sh
 
 ## Comparison to Legacy-Ray-Tracer
 
-Note: The following comparison may be out of date and performance may have changed as the project has been updated since this comparison was made, with both new features and performance improvements.
+Note: The following comparison is likely out of date and performance will have changed as the project has been updated since this comparison was made, with both new features and performance improvements.
 An equal test between the two now would not be a good comparison with how much the project has changed since then and was only possible initially as the two codebases were very similar.
 
 ### Output variables
