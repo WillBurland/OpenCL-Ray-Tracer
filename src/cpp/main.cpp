@@ -1,14 +1,19 @@
 #include "bitmap_io.hpp"
 #include "colour.hpp"
 #include "utility.hpp"
+#include "window_utilities.hpp"
 #include "opencl_objects/cl_bounding_box.hpp"
 #include "opencl_objects/cl_camera.hpp"
 #include "opencl_objects/cl_sphere.hpp"
+
+#include <thread>
 
 unsigned char image[IMAGE_WIDTH][IMAGE_HEIGHT][BYTES_PER_PIXEL];
 
 int main()
 {	
+	std::thread windowThread(Win32Window);
+
 	// seed random number generator with current time
 	srand(time(NULL));
 
@@ -253,6 +258,12 @@ int main()
 					WriteColour(i + (int)blockSize.y * y, j + (int)blockSize.x * x, pixelColour);
 				}
 			}
+
+			// write image to .bmp file
+			printf("Writing image to file...\n");
+			char* fileName = (char*)malloc(256);
+			sprintf(fileName, "%s%s", imageFileName, imageFileExtension);
+			generateBitmapImage((unsigned char*)image, IMAGE_HEIGHT, IMAGE_WIDTH, fileName);
 			
 			printf("Blocks rendered: %d%%\r", (int)((float)blockNum / (float)(blockNumX * blockNumY) * 100.0f));
 		}
@@ -263,14 +274,10 @@ int main()
 	queue.flush();
 	queue.finish();
 
-	// write image to .bmp file
-	printf("Writing image to file...\n");
-	char* fileName = (char*)malloc(256);
-	sprintf(fileName, "%s%s", imageFileName, imageFileExtension);
-	generateBitmapImage((unsigned char*)image, IMAGE_HEIGHT, IMAGE_WIDTH, fileName);
-
 	std::chrono::steady_clock::time_point endRender = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endRender - beginRender).count() / 1000000);
+
+	windowThread.join();
 
 	return 0;
 }
