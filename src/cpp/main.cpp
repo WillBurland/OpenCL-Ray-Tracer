@@ -13,7 +13,8 @@ int main()
 	srand(time(NULL));
 
 	// file name constants
-	char* imageFileName = (char*)"output.bmp";
+	char* imageFileName = (char*)"output";
+	char* imageFileExtension = (char*)".bmp";
 	char* kernelFileName = (char*)"gpu_kernel.cl";
 
 	// opencl setup
@@ -27,8 +28,49 @@ int main()
 	std::chrono::steady_clock::time_point beginKernel = std::chrono::steady_clock::now();
 	printf("\n === Compiling kernel ===\n");
 
-	// image data
-	cl_vec3 *imageData = (cl_vec3*)malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(cl_vec3));
+	// kernel setup
+	printf("Loading kernel .cl file...\n");
+	std::ifstream kernelSourceFile(kernelFileName);
+	std::string kernelSourceCode(std::istreambuf_iterator<char>(kernelSourceFile), (std::istreambuf_iterator<char>()));
+	printf("Creating kernel program...\n");
+	cl::Program::Sources sources;
+	sources.push_back({kernelSourceCode.c_str(), kernelSourceCode.length()});
+	printf("Building kernel...\n");
+	cl::Program program(context, sources);
+	if (program.build({defaultDevice}) != CL_SUCCESS)
+	{
+		std::cout << "Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(defaultDevice) << std::endl;
+		return 0;
+	}
+
+	cl::Kernel kernel(program, "pixel_colour"); // kernel function name
+
+	printf("Calculating block size...\n");
+	// get work group size
+	size_t workGroupSize;
+	err = kernel.getWorkGroupInfo(defaultDevice, CL_KERNEL_WORK_GROUP_SIZE, &workGroupSize);
+	if (err != CL_SUCCESS)
+	{
+		std::cout << "Could not get work group size: " << err << std::endl;
+		return -1;
+	}
+
+	// get ideal block size, based on target block number
+	printf("Blocks to use: %d\n", TARGET_BLOCK_NUM);
+	cl_vec3 blockSize = GetIdealBlockSize(IMAGE_WIDTH * IMAGE_HEIGHT, TARGET_BLOCK_NUM);
+	size_t newSize = 0;
+	for (int i = workGroupSize; i > 0; i--)
+	{
+		if ((int)(blockSize.x * blockSize.y) % i == 0)
+		{
+			newSize = i;
+			break;
+		}
+	}
+	workGroupSize = newSize;
+
+	cl::NDRange local(workGroupSize); // amount of pixels to process per work group
+	cl::NDRange global(blockSize.x * blockSize.y); // amount of pixels in each block
 
 	// camera data
 	cl_camera *camera = (cl_camera*)malloc(sizeof(cl_camera));
@@ -42,10 +84,10 @@ int main()
 		2.0f,                          // focus distance
 		1.2f                           // aperture
 	);
-	camera->width           = IMAGE_WIDTH;
-	camera->height          = IMAGE_HEIGHT;
-	camera->samplesPerPixel = SAMPLES_PER_PIXEL;
-	camera->maxDepth        = MAX_DEPTH;
+	camera->blockSize = blockSize;
+
+	// image block data
+	cl_vec3 *imageBlockData = (cl_vec3*)malloc(blockSize.x * blockSize.y * sizeof(cl_vec3));
 
 	// sphere data
 	cl_int numSpheres = 8;
@@ -110,24 +152,9 @@ int main()
 		==========================================================
 	*/
 
-	// kernel setup
-	printf("Loading kernel .cl file...\n");
-	std::ifstream kernelSourceFile(kernelFileName);
-	std::string kernelSourceCode(std::istreambuf_iterator<char>(kernelSourceFile), (std::istreambuf_iterator<char>()));
-	printf("Creating kernel program...\n");
-	cl::Program::Sources sources;
-	sources.push_back({kernelSourceCode.c_str(), kernelSourceCode.length()});
-	printf("Building kernel...\n");
-	cl::Program program(context, sources);
-	if (program.build({defaultDevice}) != CL_SUCCESS)
-	{
-		std::cout << "Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(defaultDevice) << std::endl;
-		return 0;
-	}
-
 	// allocate memory on GPU
 	printf("Allocating GPU memory...\n");
-	cl::Buffer bufferImageData         (context, CL_MEM_WRITE_ONLY, sizeof(cl_vec3) * IMAGE_WIDTH * IMAGE_HEIGHT);
+	cl::Buffer bufferImageBlockData    (context, CL_MEM_WRITE_ONLY, sizeof(cl_vec3) * blockSize.x * blockSize.y);
 	cl::Buffer bufferHDRImageData      (context, CL_MEM_READ_ONLY,  sizeof(cl_vec3) * result.width * result.height);
 	cl::Buffer bufferHDRImageDataWidth (context, CL_MEM_READ_ONLY,  sizeof(cl_int));
 	cl::Buffer bufferHDRImageDataHeight(context, CL_MEM_READ_ONLY,  sizeof(cl_int));
@@ -144,7 +171,7 @@ int main()
 
 	// copy data to GPU
 	printf("Writing to GPU memory...\n");
-	queue.enqueueWriteBuffer(bufferImageData,          CL_TRUE, 0, sizeof(cl_vec3) * IMAGE_WIDTH * IMAGE_HEIGHT,   imageData);
+	queue.enqueueWriteBuffer(bufferImageBlockData,     CL_TRUE, 0, sizeof(cl_vec3) * blockSize.x * blockSize.y,    imageBlockData);
 	queue.enqueueWriteBuffer(bufferHDRImageData,       CL_TRUE, 0, sizeof(cl_vec3) * result.width * result.height, hdrImageData);
 	queue.enqueueWriteBuffer(bufferHDRImageDataWidth,  CL_TRUE, 0, sizeof(cl_int),                                 &hdrImageDataWidth);
 	queue.enqueueWriteBuffer(bufferHDRImageDataHeight, CL_TRUE, 0, sizeof(cl_int),                                 &hdrImageDataHeight);
@@ -157,22 +184,9 @@ int main()
 	queue.enqueueWriteBuffer(bufferBoundingBoxes,      CL_TRUE, 0, sizeof(cl_bounding_box) * numBoundingBoxes,     boundingBoxes);
 	queue.enqueueWriteBuffer(bufferNumBoundingBoxes,   CL_TRUE, 0, sizeof(cl_int),                                 &numBoundingBoxes);
 
-	printf("Setting kernel arguments...\n");
-	cl::Kernel kernel(program, "pixel_colour");     // kernel function name
-	cl::NDRange global(IMAGE_WIDTH * IMAGE_HEIGHT); // amount of pixels to process
-
-	size_t workGroupSize;
-	err = kernel.getWorkGroupInfo(defaultDevice, CL_KERNEL_WORK_GROUP_SIZE, &workGroupSize);
-	if (err != CL_SUCCESS)
-	{
-		std::cout << "Could not get work group size: " << err << std::endl;
-		return -1;
-	}
-
-	cl::NDRange local(workGroupSize); // amount of pixels to process per work group
-
 	// set kernel arguments
-	kernel.setArg(0,  bufferImageData);
+	printf("Setting kernel arguments...\n");
+	kernel.setArg(0,  bufferImageBlockData);
 	kernel.setArg(1,  bufferHDRImageData);
 	kernel.setArg(2,  bufferHDRImageDataWidth);
 	kernel.setArg(3,  bufferHDRImageDataHeight);
@@ -190,71 +204,70 @@ int main()
 
 	// output job info
 	printf("\n === Job info ===\n");
-	printf("Global work size: %d\n", IMAGE_WIDTH * IMAGE_HEIGHT);
+	printf("Global work size: %d\n", (int)global[0] * (int)global[1]);
 	printf("Work group size: %d\n", workGroupSize);
-	printf("Work groups to use: %d\n", (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize);
+	printf("Work groups to use: %d\n", (int)global[0] * (int)global[1] / workGroupSize);
 	printf(" === Done ===\n\n");
-
-	// output kernel memory usage
-	cl_ulong kernelMemoryUsage = 0;
-	err = kernel.getWorkGroupInfo(defaultDevice, CL_KERNEL_PRIVATE_MEM_SIZE, &kernelMemoryUsage);
-	if (err != CL_SUCCESS)
-	{
-		std::cout << "Could not get kernel memory usage: " << err << std::endl;
-		return -1;
-	}
-
-	printf(" === Rendering ===\nGPU memory usage: %d KB\n", (
-		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(cl_vec3)   + // imageDataBuffer
-		result.width * result.height * sizeof(cl_vec3) + // hdrImageDataBuffer
-		sizeof(int)                                    + // imageDataWidthBuffer
-		sizeof(int)                                    + // imageDataHeightBuffer
-		IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(cl_uint)   + // randomSeeds
-		sizeof(cl_camera)                              + // cameraBuffer
-		numSpheres * sizeof(cl_sphere)                 + // spheresBuffer
-		sizeof(int)                                    + // numSpheresBuffer
-		numTriangles * sizeof(cl_triangle)             + // trianglesBuffer
-		sizeof(int)                                    + // numTrianglesBuffer
-		numBoundingBoxes * sizeof(cl_bounding_box)     + // boundingBoxesBuffer
-		sizeof(int)                                    + // numBoundingBoxesBuffer
-		kernelMemoryUsage * (IMAGE_WIDTH * IMAGE_HEIGHT) / workGroupSize // kernel memory usage
-	) / 1024);
 	
-	// run kernel
+	// start kernel timer
 	printf("Running kernel...\n");
 	std::chrono::steady_clock::time_point beginRender = std::chrono::steady_clock::now();
-	err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local);
-	if (err != CL_SUCCESS)
-	{
-		std::cout << "Could not run kernel: " << err << std::endl;
-		return -1;
-	}
 	
-	// read data from GPU
-	queue.enqueueReadBuffer(bufferImageData, CL_TRUE, 0, IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(cl_vec3), imageData);
-	printf("Reading GPU memory...\n");
+	// calculate block numbers
+	int blockNumX = IMAGE_WIDTH / blockSize.x;
+	int blockNumY = IMAGE_HEIGHT / blockSize.y;
+	printf("Blocks to render: %d (%d x %d)\n", blockNumX * blockNumY, blockNumX, blockNumY);
+	printf("Block size: %d x %d\n", (int)blockSize.x, (int)blockSize.y);
 
-	// clean up
-	printf("Cleaning up...\n");
-	queue.flush();
-	queue.finish();
-
-	// write image data to file
-	printf("Writing to file...\n");
-	for (int i = 0; i < IMAGE_HEIGHT; i++)
+	// render blocks
+	int blockNum = 0;
+	for (int y = blockNumY - 1; y >= 0; y--)
 	{
-		for (int j = 0; j < IMAGE_WIDTH; j++)
+		for (int x = 0; x < blockNumX; x++)
 		{
-			cl_vec3 pixelColour = (cl_vec3){
-				imageData[i * IMAGE_WIDTH + j].x,
-				imageData[i * IMAGE_WIDTH + j].y,
-				imageData[i * IMAGE_WIDTH + j].z};
-			WriteColour(i, j, IMAGE_WIDTH, IMAGE_HEIGHT, pixelColour);
+			// update camera (block offset)
+			camera->blockOffset = CreateVec3(x, y, 0);
+			cl::Buffer bufferCamera (context, CL_MEM_READ_ONLY,  sizeof(cl_camera));
+			queue.enqueueWriteBuffer(bufferCamera, CL_TRUE, 0, sizeof(cl_camera), camera);
+			kernel.setArg(5,  bufferCamera);
+
+			// run kernel for block
+			err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local);
+			if (err != CL_SUCCESS)
+			{
+				std::cout << "Could not run kernel: " << err << std::endl;
+				return -1;
+			}
+			// read image data back
+			queue.enqueueReadBuffer(bufferImageBlockData, CL_TRUE, 0, sizeof(cl_vec3) * blockSize.x * blockSize.y, imageBlockData, nullptr);
+
+			// write image data to file
+			for (int i = 0; i < blockSize.y; i++)
+			{
+				for (int j = 0; j < blockSize.x; j++)
+				{
+					cl_vec3 pixelColour = (cl_vec3){
+						imageBlockData[i * (int)blockSize.x + j].x,
+						imageBlockData[i * (int)blockSize.x + j].y,
+						imageBlockData[i * (int)blockSize.x + j].z};
+					WriteColour(i + (int)blockSize.y * y, j + (int)blockSize.x * x, pixelColour);
+				}
+			}
+			
+			printf("Blocks rendered: %d%%\r", (int)((float)blockNum / (float)(blockNumX * blockNumY) * 100.0f));
 		}
 	}
 
+	// clean up
+	printf("\nCleaning up...\n");
+	queue.flush();
+	queue.finish();
+
 	// write image to .bmp file
-	generateBitmapImage((unsigned char*)image, IMAGE_HEIGHT, IMAGE_WIDTH, imageFileName);
+	printf("Writing image to file...\n");
+	char* fileName = (char*)malloc(256);
+	sprintf(fileName, "%s%s", imageFileName, imageFileExtension);
+	generateBitmapImage((unsigned char*)image, IMAGE_HEIGHT, IMAGE_WIDTH, fileName);
 
 	std::chrono::steady_clock::time_point endRender = std::chrono::steady_clock::now();
 	printf(" === Done in %f s ===\n\n", (float)std::chrono::duration_cast<std::chrono::microseconds>(endRender - beginRender).count() / 1000000);

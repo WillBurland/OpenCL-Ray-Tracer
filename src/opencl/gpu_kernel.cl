@@ -58,6 +58,8 @@ typedef struct
 	Vec3  lowerLeftCorner;
 	Vec3  defocusDiscU;
 	Vec3  defocusDiscV;
+	Vec3  blockSize;
+	Vec3  blockOffset;
 	int   width;
 	int   height;
 	int   samplesPerPixel;
@@ -613,14 +615,16 @@ __kernel void pixel_colour(
 	int triangleCount = *_triangleCount;
 	BoundingBox *boundingBoxes = _boundingBoxes;
 	int boundingBoxCount = *_boundingBoxCount;
+	int blockSizeX = (int)camera.blockSize.x;
+	int blockSizeY = (int)camera.blockSize.y;
 
 	Vec3 pixelColour = {0.0, 0.0, 0.0};
 	Vec3 colourToAdd = {0.0, 0.0, 0.0};
 
 	for (int i = 0; i < camera.samplesPerPixel; i++)
 	{
-		float u = ((float)(global_id % camera.width) + RandFloatFromSeed(&seed)) / camera.width;
-		float v = ((float)(global_id / camera.width) + RandFloatFromSeed(&seed)) / camera.height;
+		float u = ((float)(global_id % blockSizeX) + (blockSizeX * camera.blockOffset.x) + RandFloatFromSeed(&seed)) / camera.width;
+		float v = ((float)(global_id / blockSizeX) + (blockSizeY * camera.blockOffset.y) + RandFloatFromSeed(&seed)) / camera.height;
 
 		Ray ray = GetRay(camera, u, v, &seed);
 		colourToAdd = RayColour(ray, camera.maxDepth, hdrImage, hdrImageWidth, hdrImageHeight, spheres, sphereCount, triangles, triangleCount, boundingBoxes, boundingBoxCount, &seed);
@@ -641,18 +645,4 @@ __kernel void pixel_colour(
 	}
 
 	RGB[global_id] = Vec3DivFloat(pixelColour, camera.samplesPerPixel);
-
-	// print out progress
-	if (global_id == 0)
-	{
-		printf("Approx Progress: 0%%");
-	}
-	else if (global_id == get_global_size(0) - 1)
-	{
-		printf("\rApprox Progress: 100%%\n");
-	}
-	else if (global_id % (get_global_size(0) / 100) == 0)
-	{
-		printf("\rApprox Progress: %d%%", (int)((float)global_id / (float)get_global_size(0) * 100.0f));
-	}
 }

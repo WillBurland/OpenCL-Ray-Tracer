@@ -188,3 +188,49 @@ void ReadHdrImageData(cl_vec3 *hdrImageData, HDRLoaderResult &result)
 		hdrImageData[i] = CreateVec3(r, g, b);
 	}
 }
+
+std::vector<int> GetFactors(int n)
+{
+    std::vector<int> factors;
+    for (int i = 1; i <= n; ++i)
+        if (n % i == 0)
+            factors.push_back(i);
+
+    return factors;
+}
+
+std::tuple<int, int, int> FactorCombination(int num1, int num2, int maxProduct)
+{
+    std::vector<int> factorsNum1 = GetFactors(num1);
+    std::vector<int> factorsNum2 = GetFactors(num2);
+
+    std::vector<std::tuple<int, int, int>> combinations;
+
+    for (int factor1 : factorsNum1)
+	{
+        for (int factor2 : factorsNum2)
+		{
+            int product = factor1 * factor2;
+            if (product <= maxProduct)
+                combinations.push_back(std::make_tuple(factor1, factor2, product));
+        }
+    }
+
+    // Sort combinations by product and similarity of factors
+    std::sort(combinations.begin(), combinations.end(), [](const auto& a, const auto& b)
+	{
+        return std::make_tuple(std::get<2>(a), -std::abs(std::get<0>(a) - std::get<1>(a))) >
+               std::make_tuple(std::get<2>(b), -std::abs(std::get<0>(b) - std::get<1>(b)));
+    });
+
+	return (combinations.empty() ? std::make_tuple(0, 0, 0) : combinations.front());
+}
+
+cl_vec3 GetIdealBlockSize(int globalSize, int localSize)
+{
+	int maxProduct = (int)ceil((float)(globalSize) / (float)localSize);
+
+	std::tuple<int, int, int> combination = FactorCombination(IMAGE_WIDTH, IMAGE_HEIGHT, maxProduct);
+	
+	return CreateVec3(std::get<0>(combination), std::get<1>(combination), 0);
+}

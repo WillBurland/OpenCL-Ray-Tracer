@@ -2,7 +2,7 @@
 
 extern unsigned char image[IMAGE_HEIGHT][IMAGE_WIDTH][BYTES_PER_PIXEL];
 
-void WriteColour(int x, int y, int width, int height, cl_vec3 pixelColour)
+void WriteColour(int x, int y, cl_vec3 pixelColour)
 {
 	// gamma correct for gamma=2.0
 	float r = sqrt(pixelColour.x) * 255.0f;

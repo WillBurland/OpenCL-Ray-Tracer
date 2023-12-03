@@ -29,6 +29,11 @@ void CalculateCamera(cl_camera *camera, cl_vec3 lookFrom, cl_vec3 lookAt, cl_vec
 	cl_vec3 defocusDiscV = v * defocusRadius;
 
 	// set camera values
+	camera->width           = IMAGE_WIDTH;
+	camera->height          = IMAGE_HEIGHT;
+	camera->blockOffset     = CreateVec3(0, 0, 0);
+	camera->samplesPerPixel = SAMPLES_PER_PIXEL;
+	camera->maxDepth        = MAX_DEPTH;
 	camera->origin          = lookFrom;
 	camera->horizontal      = viewportU;
 	camera->vertical        = viewportV;

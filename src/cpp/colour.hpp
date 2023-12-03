@@ -5,6 +5,6 @@
 
 #include "opencl_objects/cl_vec3.hpp"
 
-void WriteColour(int x, int y, int width, int height, cl_vec3 pixelColour);
+void WriteColour(int x, int y, cl_vec3 pixelColour);
 
 #endif

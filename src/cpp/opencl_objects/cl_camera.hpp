@@ -11,6 +11,8 @@ struct cl_camera
 	cl_vec3  lowerLeftCorner;
 	cl_vec3  defocusDiscU;
 	cl_vec3  defocusDiscV;
+	cl_vec3  blockSize;
+	cl_vec3  blockOffset;
 	cl_int   width;
 	cl_int   height;
 	cl_int   samplesPerPixel;
