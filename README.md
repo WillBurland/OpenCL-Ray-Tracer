@@ -56,11 +56,26 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 - Scene descriptor JSON file
 - Specular reflection
 - Code cleanup and commenting
-- Switch to CMake or similar build system, instead of a .bat file
 
-## Notes
+## Building the project
 
-- Output resolution width must be a multiple of 128 (unsure as of *exactly* why)
+### Prerequisites
+
+1. **CMake:** Ensure that CMake is installed on your system.
+2. **MinGW:** Install MinGW on your system. Ensure that the `mingw32-make` executable is in your PATH.
+
+### Build Steps
+
+1. Clone the repository to your system.
+2. Navigate to the root directory of the project.
+3. Run the following commands:
+```
+mkdir build
+cd build
+cmake -G "MinGW Makefiles" ..
+mingw32-make
+```
+4. The executable will be located in the `build` directory.
 
 ## References & Inspiration
 
