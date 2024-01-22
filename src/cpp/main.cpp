@@ -20,7 +20,7 @@ int main()
 	// file name constants
 	char* imageFileName = (char*)"output";
 	char* imageFileExtension = (char*)".bmp";
-	char* kernelFileName = (char*)"gpu_kernel.cl";
+	char* kernelFileName = (char*)"assets/gpu_kernel.cl";
 
 	// opencl setup
 	cl_int err;
@@ -115,7 +115,7 @@ int main()
 	cl_vec3 max = CreateVec3(std::numeric_limits<float>::min(), std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
 
 	// mesh data
-	std::ifstream meshFile("f1_car.obj");
+	std::ifstream meshFile("assets/f1_car.obj");
 	cl_vec3 meshFileTranslate = CreateVec3(0.0f,  -0.5f,  -1.0f);
 	cl_vec3 meshFileScale     = CreateVec3(0.15f,  0.15f,  0.15f);
 	cl_int numVertices        = GetNumOfVertices(meshFile); meshFile.clear(); meshFile.seekg(0, std::ios::beg);
@@ -130,7 +130,7 @@ int main()
 
 	// hdr image data
 	HDRLoaderResult result;
-	if (HDRLoader::load("skybox.hdr", result))
+	if (HDRLoader::load("assets/skybox.hdr", result))
 	{
 		printf("HDR image loaded, size: %d x %d\n", result.width, result.height);
 	}
