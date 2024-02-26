@@ -124,7 +124,7 @@ int main()
 	cl_triangle *triangles    = (cl_triangle*)malloc(numTriangles * sizeof(cl_triangle));
 
 	// read mesh data into vertices and triangles, and calculate bounding box
-	ReadMeshData(meshFile, vertices, triangles, min, max, meshFileScale, meshFileTranslate);
+	ReadMeshData(meshFile, vertices, triangles, min, max, meshFileScale, meshFileTranslate, CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1));
 	meshFile.close();
 	boundingBoxes[0] = (cl_bounding_box){0, min, max};
 
@@ -234,7 +234,7 @@ int main()
 			camera->blockOffset = CreateVec3(x, y, 0);
 			cl::Buffer bufferCamera (context, CL_MEM_READ_ONLY,  sizeof(cl_camera));
 			queue.enqueueWriteBuffer(bufferCamera, CL_TRUE, 0, sizeof(cl_camera), camera);
-			kernel.setArg(5,  bufferCamera);
+			kernel.setArg(5, bufferCamera);
 
 			// run kernel for block
 			err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local);

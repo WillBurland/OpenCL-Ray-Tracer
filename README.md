@@ -55,6 +55,12 @@ This equates to an approximate speed up of 320x for my hardware between the two 
 - Texture support
 - Scene descriptor JSON file
 - Specular reflection
+- Proper light sources (sun, emmisive power, etc.)
+- Model rotation
+- Multiple models
+- Light scattering importance sampling
+- Bounding volume hierarchy
+- Convert custom structs to more primitive types (i.e. Vec3 to float3)
 - Code cleanup and commenting
 
 ## Building the project

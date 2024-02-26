@@ -95,7 +95,7 @@ void SetFaceNormal(HitRecord *hitRecord, Ray ray, Vec3 outwardNormal);
 bool HitAnything(HitRecord *hitRecord, Ray ray, float tMin, float tMax, Sphere *spheres, int sphereCount, Triangle *triangles, int triangleCount, BoundingBox *boundingBoxes, int boundingBoxCount);
 bool LambertianScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
-bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
+bool TransparentScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed);
 bool HitSphere(Sphere s, Ray r, float tMin, float tMax, HitRecord *hit);
 bool HitTriangle(Triangle t, Ray r, float tMin, float tMax, HitRecord *hit);
 bool HitBoundingBox(Vec3 min, Vec3 max, Ray r);
@@ -311,7 +311,7 @@ Vec3 RayColour(Ray ray, int maxDepth, Vec3 *hdrImage, int hdrImageWidth, int hdr
 				} break;
 				case 2:
 				{
-					if (DielectricScatter(ray, &hitRecord, &attenuation, &scattered, seed))
+					if (TransparentScatter(ray, &hitRecord, &attenuation, &scattered, seed))
 					{
 						ray = scattered;
 						rayColour = Vec3MulVec3(rayColour, attenuation);
@@ -320,12 +320,12 @@ Vec3 RayColour(Ray ray, int maxDepth, Vec3 *hdrImage, int hdrImageWidth, int hdr
 					}
 					else
 					{
-						return (Vec3){ 0, 0, 0 };
+						return hitRecord.material.albedo;
 					}
 				} break;
 				case 3:
 				{
-					return rayColour;
+					return Vec3MulVec3(rayColour, hitRecord.material.albedo);
 				}
 			}
 			currentDepth++;
@@ -422,7 +422,7 @@ bool MetalScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scatter
 	return Vec3Dot(scattered->direction, hitRecord->normal) > 0;
 }
 
-bool DielectricScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed)
+bool TransparentScatter(Ray ray, HitRecord *hitRecord, Vec3 *attenuation, Ray *scattered, ulong *seed)
 {
 	*attenuation = (Vec3){ 1.0f, 1.0f, 1.0f };
 	float refractionRatio = hitRecord->frontFace ? (1.0f / hitRecord->material.ior) : hitRecord->material.ior;

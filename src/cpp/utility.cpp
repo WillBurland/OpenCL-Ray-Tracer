@@ -96,7 +96,7 @@ int GetNumOfFaces(std::ifstream &meshFile)
 	return numFaces;
 }
 
-void ReadMeshData(std::ifstream &meshFile, cl_vec3 *vertices, cl_triangle *triangles, cl_vec3 &min, cl_vec3 &max, cl_vec3 meshFileScale, cl_vec3 meshFileTranslate)
+void ReadMeshData(std::ifstream &meshFile, cl_vec3 *vertices, cl_triangle *triangles, cl_vec3 &min, cl_vec3 &max, cl_vec3 meshFileScale, cl_vec3 meshFileTranslate, cl_material material)
 {
 	// read vertices and faces from mesh file, scale and translate vertices
 	int currentVertex = 0;
@@ -160,7 +160,7 @@ void ReadMeshData(std::ifstream &meshFile, cl_vec3 *vertices, cl_triangle *trian
 				vertices[a - 1],
 				vertices[b - 1],
 				vertices[c - 1],
-				CreateMaterial(CreateVec3(0.8f, 0.6f, 0.2f), 0.5f, 0.0f, 1),
+				material,
 				0
 			);
 

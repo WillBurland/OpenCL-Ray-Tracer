@@ -34,6 +34,7 @@ target_link_libraries (RayTracer-x64
 file (GLOB ASSETS
 	src/assets/img/*
 	src/assets/models/*
+	src/assets/scenes/*
 	src/opencl/gpu_kernel.cl
 )
 
